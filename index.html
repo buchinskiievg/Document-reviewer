@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DocReview AI</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{--bg:#f0ede8;--sf:#fff;--sf2:#f7f5f1;--bd:#ddd8d0;--bd2:#ebe7e1;--tx:#1a1a1a;--tx2:#5c574f;--tx3:#9a958c;--ac:#c44425;--acs:rgba(196,68,37,.07);--bl:#2e6bc6;--bls:rgba(46,107,198,.06);--gn:#24825a;--gns:rgba(36,130,90,.06);--am:#b87314;--ams:rgba(184,115,20,.06);--sh:0 1px 4px rgba(0,0,0,.06);--sh2:0 4px 16px rgba(0,0,0,.07);--fn:'IBM Plex Sans',system-ui,sans-serif;--fm:'IBM Plex Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fn);background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;font-size:13px}
+button{font-family:var(--fn);cursor:pointer}textarea{font-family:var(--fn)}
+input[type=file]{display:none}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.03)}
+::-webkit-scrollbar-thumb{background:#c5c0b8;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#a09b93}
+
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* Topbar */
+.top{height:48px;background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0;gap:8px}
+.top-l,.top-r{display:flex;align-items:center;gap:7px}
+.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--ac),#e06a3e);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.brand{font-size:14px;font-weight:700;letter-spacing:-.02em}
+.brand b{color:var(--ac)}
+.tag{font-size:8px;color:var(--tx3);font-family:var(--fm);background:var(--sf2);padding:1px 5px;border-radius:3px;border:1px solid var(--bd2)}
+.sep{height:16px;width:1px;background:var(--bd)}
+.fname{font-size:11px;color:var(--tx3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--bd);background:var(--sf2);color:var(--tx2);transition:all .15s}
+.btn:hover{border-color:var(--tx3)}
+.btn-go{background:linear-gradient(135deg,var(--ac),#e06a3e);color:#fff;border:none;font-weight:700;padding:5px 14px}
+.btn-go:disabled{background:var(--bd);color:var(--tx3);cursor:default}
+.btn-prov{font-family:var(--fm);font-weight:700;font-size:10px;border-radius:6px;padding:4px 8px;display:flex;align-items:center;gap:3px}
+.zm{display:flex;align-items:center;background:var(--sf2);border-radius:6px;padding:1px 5px;border:1px solid var(--bd)}
+.zm span{font-size:9px;color:var(--tx3);font-family:var(--fm);min-width:32px;text-align:center}
+.sts{display:flex;align-items:center;gap:8px;margin-right:4px}
+.st{display:flex;align-items:center;gap:2px}
+.st-d{width:5px;height:5px;border-radius:50%}
+.st span{font-size:10px;font-weight:700;font-family:var(--fm)}
+.st-t{font-size:9px;color:var(--tx3);font-family:var(--fm)}
+
+.err-bar{background:var(--acs);border-bottom:1px solid rgba(196,68,37,.2);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--ac);font-weight:600}
+
+.body{display:flex;flex:1;overflow:hidden}
+
+/* Left panel: refs + prompt */
+.left{width:220px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .3s}
+.left.collapsed{width:38px}
+.left-tog{background:none;border:none;color:var(--tx2);padding:9px 11px;text-align:left;font-size:12px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bd2);width:100%}
+.left-body{flex:1;overflow:auto;display:flex;flex-direction:column}
+.left-sec{padding:8px;border-bottom:1px solid var(--bd2)}
+.left-sec-title{font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.ref{display:flex;align-items:center;gap:5px;padding:5px 7px;background:var(--sf2);border-radius:5px;border:1px solid var(--bd2);margin-bottom:3px;font-size:10px;animation:fadeUp .3s}
+.ref .n{color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref .sz{font-size:8px;color:var(--tx3)}
+.ref .rm{background:none;border:none;color:var(--tx3);font-size:10px;padding:0;flex-shrink:0}
+.add-ref{width:100%;padding:6px 0;border-radius:5px;border:1px dashed var(--bd);background:none;color:var(--tx3);font-size:10px;margin-top:3px}
+.prompt-area{padding:8px}
+.prompt-ta{width:100%;background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font-size:10px;color:var(--tx);outline:none;line-height:1.5;resize:vertical;min-height:80px}
+.prompt-ta:focus{border-color:var(--ac)}
+
+/* Viewer */
+.viewer{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.vscroll{flex:1;overflow:auto;background:var(--bg);cursor:grab;position:relative}
+.vscroll.dragging{cursor:grabbing}
+.pdfwrap{padding:20px;display:flex;justify-content:center;min-height:100%;min-width:100%}
+.pdfbox{position:relative;box-shadow:var(--sh2);border-radius:3px;overflow:visible;background:#fff;line-height:0;flex-shrink:0}
+
+.upload-zone{flex:1;display:flex;align-items:center;justify-content:center}
+.ubox{display:flex;flex-direction:column;align-items:center;padding:40px;border:2px dashed var(--bd);border-radius:14px;cursor:pointer;max-width:380px;width:100%;transition:border-color .2s}
+.ubox:hover{border-color:var(--ac)}
+
+.spinner{width:24px;height:24px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px}
+
+/* Check overlay */
+.cov{position:absolute;inset:0;background:rgba(240,237,232,.93);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50}
+.cov-in{width:360px;text-align:center}
+.pbar{width:100%;height:5px;background:var(--bd);border-radius:3px;overflow:hidden;margin:12px 0}
+.pfill{height:100%;border-radius:3px;transition:width .4s}
+.ldots{display:inline-flex;gap:3px;vertical-align:middle;margin-left:5px}
+.ldots span{width:5px;height:5px;border-radius:50%;animation:dp 1.4s ease-in-out infinite}
+.ldots span:nth-child(2){animation-delay:.2s}
+.ldots span:nth-child(3){animation-delay:.4s}
+
+/* Pin */
+.pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10}
+.pin.active{z-index:100}
+.pin-p{position:absolute;top:50%;left:50%;width:40px;height:40px;border-radius:50%;opacity:.4;transform:translate(-50%,-50%);animation:pp 1.6s ease-in-out infinite}
+.pin-d{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--fm);transition:all .3s cubic-bezier(.34,1.56,.64,1)}
+
+/* Bottom bar */
+.bbar{height:32px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:center;gap:6px;background:var(--sf);flex-shrink:0;padding:0 10px;position:relative}
+.pb{width:24px;height:24px;border-radius:5px;border:1px solid var(--bd);background:var(--sf);color:var(--tx2);font-size:11px;display:flex;align-items:center;justify-content:center;font-family:var(--fm)}
+.pb:hover{background:var(--sf2)}
+.pb:disabled{opacity:.3;cursor:default}
+.pg-sel{position:relative;display:inline-block}
+.pg-cur{min-width:40px;height:24px;border:1px solid var(--bd);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--fm);font-weight:600;cursor:pointer;background:var(--sf);color:var(--tx);gap:3px;padding:0 6px}
+.pg-cur:hover{border-color:var(--ac)}
+.pg-drop{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:var(--sf);border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh2);max-height:200px;overflow:auto;z-index:200;min-width:50px;padding:4px}
+.pg-drop button{display:block;width:100%;padding:4px 12px;border:none;background:none;font-size:11px;font-family:var(--fm);color:var(--tx2);border-radius:4px;text-align:center;cursor:pointer}
+.pg-drop button:hover{background:var(--sf2)}
+.pg-drop button.cur{background:var(--ac);color:#fff;font-weight:700}
+.pg-tot{font-size:10px;color:var(--tx3);font-family:var(--fm)}
+
+/* Right panel: comments */
+.right{width:320px;background:var(--sf);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.r-head{padding:10px 12px;border-bottom:1px solid var(--bd2);display:flex;align-items:center;justify-content:space-between}
+.r-head .t{font-size:12px;font-weight:700}
+.r-head .c{font-size:9px;color:var(--tx3);font-family:var(--fm)}
+.r-scroll{flex:1;overflow:auto;padding:8px}
+.r-empty{text-align:center;padding:24px;color:var(--tx3);font-size:11px}
+
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:6px;transition:all .2s;cursor:pointer;scroll-margin-top:8px;animation:fadeUp .3s}
+.card.active{background:var(--sf2);padding:14px}
+.card.resolved{opacity:.45;cursor:default}
+.card-hd{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.card-sv{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:9px;font-weight:800}
+.card-sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-family:var(--fm)}
+.card-pr{font-size:8px;color:var(--tx3);margin-left:auto;font-family:var(--fm);background:var(--sf2);padding:1px 4px;border-radius:3px;border:1px solid var(--bd2)}
+.card-tt{font-size:12px;font-weight:700;line-height:1.4;margin-bottom:6px}
+.card-tx{font-size:11px;color:var(--tx2);line-height:1.65;margin-bottom:12px;white-space:pre-line}
+.card-acts{display:flex;gap:5px}
+.card-b{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;border-radius:6px;font-size:10px;font-weight:600;transition:all .15s}
+.card-ba{background:var(--gns);color:var(--gn);border:1px solid rgba(36,130,90,.12)}
+.card-br{background:var(--acs);color:var(--ac);border:1px solid rgba(196,68,37,.12)}
+
+.pfooter{padding:8px 12px;border-top:1px solid var(--bd2);background:var(--sf2)}
+.pfooter-bar{height:3px;background:var(--bd);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.pfooter-fill{height:100%;background:var(--gn);border-radius:2px;transition:width .4s}
+.pfooter-tx{font-size:9px;color:var(--tx3);text-align:center}
+
+/* Log panel in settings */
+.log-area{width:100%;height:200px;background:#1a1a1a;color:#a0e080;font-family:var(--fm);font-size:10px;padding:8px;border-radius:6px;overflow:auto;white-space:pre-wrap;line-height:1.5;border:none;resize:vertical}
+
+/* Modal */
+.mbg{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.2);backdrop-filter:blur(4px)}
+.mdl{width:560px;max-height:88vh;background:var(--sf);border-radius:12px;box-shadow:var(--sh2);display:flex;flex-direction:column;overflow:hidden}
+.mdl-h{padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.mdl-h h2{font-size:14px;font-weight:700}
+.mdl-h p{font-size:10px;color:var(--tx3);margin-top:1px}
+.mdl-cl{background:none;border:none;color:var(--tx3);font-size:16px}
+.mdl-b{flex:1;overflow:auto;padding:16px}
+.mdl-f{padding:10px 18px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:6px}
+
+/* Settings tabs */
+.tabs{display:flex;gap:2px;margin-bottom:14px;background:var(--sf2);border-radius:7px;padding:2px}
+.tab{flex:1;padding:6px 0;border-radius:5px;border:none;background:none;font-size:11px;font-weight:600;color:var(--tx3);text-align:center;font-family:var(--fn)}
+.tab.active{background:var(--sf);color:var(--tx);box-shadow:var(--sh)}
+
+.pvg{display:flex;gap:5px;margin-bottom:16px}
+.pvc{flex:1;padding:8px 6px;border-radius:7px;text-align:center;transition:all .2s;border:2px solid var(--bd2);background:var(--sf2)}
+.pvc.sel{border-color:currentColor}
+.pvc .ic{font-size:16px}
+.pvc .nm{font-size:10px;font-weight:700;margin-top:2px}
+.pvc .rc{font-size:8px;margin-top:1px}
+
+.ib{padding:10px;border-radius:7px;margin-bottom:14px}
+.ib h4{font-size:11px;font-weight:600;margin-bottom:3px}
+.ib p{font-size:10px;color:var(--tx2);line-height:1.4}
+
+.sl{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+
+.ks{margin-bottom:12px;padding:10px;background:var(--sf2);border-radius:8px;border:1px solid var(--bd2)}
+.ks-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.ks-hl{display:flex;align-items:center;gap:5px}
+.ks-add{padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;border:1px solid}
+.ks-e{font-size:9px;color:var(--tx3);padding:4px 0;text-align:center}
+.kr{display:flex;align-items:center;gap:4px;margin-bottom:4px;padding:4px 6px;background:var(--sf);border-radius:5px;border:1px solid var(--bd2)}
+.kt{width:14px;height:14px;border-radius:3px;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:800;flex-shrink:0}
+.kt.on{background:currentColor}
+.kl{width:60px;background:none;border:none;outline:none;font-size:9px;font-weight:600;color:var(--tx);font-family:var(--fn)}
+.ki{flex:1;background:var(--sf2);border:1px solid var(--bd2);border-radius:3px;padding:2px 5px;font-size:9px;color:var(--tx);outline:none;font-family:var(--fm)}
+.kd{background:none;border:none;color:var(--tx3);font-size:11px;padding:0;flex-shrink:0}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pp{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.4}50%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
+@keyframes dp{0%,80%,100%{transform:scale(.4);opacity:.3}40%{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PROVS={
+  gemini:{n:'Gemini',i:'\u{1F535}',c:'#3B82F6',d:'Gemini 2.5 Flash \u2014 native PDF',k:true,rec:true},
+  claude:{n:'Claude',i:'\u{1F7E0}',c:'#D97706',d:'Claude Sonnet 4',k:true},
+  gpt:{n:'GPT',i:'\u{1F7E2}',c:'#10B981',d:'GPT-4o Vision',k:true},
+};
+
+const DEF_PROMPT=`Focus on TECHNICAL issues only:
+- Wrong connections, missing wires, incorrect terminal numbering
+- Wrong component designations (should follow IEC 81346)
+- Incorrect voltage levels (must be per IEC 60038: 400V/230V, not 380V/220V)
+- Missing short-circuit calculations (IEC 60909)
+- Protection coordination issues, selectivity
+- Missing cable cross-sections or wrong selections
+- Fire safety: corridor widths, exit distances
+
+DO NOT comment on: title pages, stamps, signatures, dates, formatting, line weights, fonts.
+Be EXTREMELY thorough. Check EVERY element on every drawing.`;
+
+const SYS=`You are an expert engineering reviewer (IEC/IEEE/ISO).
+Return JSON array of found issues. Each:
+{"severity":"error|warning|info","title":"Standard: Title","text":"Details","x":0-100,"y":0-100,"page":N}
+x,y=% position on page. ONLY valid JSON array. Russian language. No markdown fences.
+Empty=[]
+
+REVIEWER INSTRUCTIONS:
+`;
+
+let S={pdfDoc:null,pdfName:'',totalPages:0,page:1,zoom:100,
+  refFiles:[],leftOpen:true,
+  comments:[],showComments:false,activeComment:null,
+  checking:false,progress:0,status:'',pageStatuses:{},
+  elapsed:0,eTimer:null,error:'',
+  showSettings:false,settingsTab:'providers',
+  customPrompt:DEF_PROMPT,
+  showPageDrop:false,
+  config:{active:'gemini',keys:{gemini:[],claude:[],gpt:[]}},
+  logs:[]
+};
+let origFile=null,rTask=null;
+
+// ═══ LOG ═══
+function log(msg,type){
+  const ts=new Date().toLocaleTimeString();
+  const entry='['+ts+'] '+(type?type.toUpperCase()+': ':'')+msg;
+  S.logs.push(entry);
+  if(S.logs.length>200)S.logs=S.logs.slice(-150);
+  console.log(entry);
+  const el=document.getElementById('logArea');
+  if(el){el.value=S.logs.join('\n');el.scrollTop=el.scrollHeight}
+}
+
+// ═══ HELPERS ═══
+function gks(p){return(S.config.keys[p]||[]).filter(k=>k.active&&k.key.trim())}
+function gk(p){const ks=gks(p);return ks.length?ks[~~(Math.random()*ks.length)].key:null}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function ft(s){const m=~~(s/60),sec=s%60;return(m?m+'m ':'')+(sec<10&&m?'0':'')+sec+'s'}
+
+async function p2b(doc,num){const pg=await doc.getPage(num);const vp=pg.getViewport({scale:1.2});const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;return cv.toDataURL('image/jpeg',0.6).split(',')[1]}
+async function f2b(file){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(file)})}
+
+async function readRefs(){
+  let c='';
+  for(const f of S.refFiles){
+    if(/\.(txt|csv|md|json|xml|html?)$/i.test(f.name)){
+      const t=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=()=>r('');fr.readAsText(f)});
+      c+='\n--- '+f.name+' ---\n'+t.slice(0,8000)+'\n';
+    }else if(/\.pdf$/i.test(f.name)){
+      try{const b=await f.arrayBuffer();const d=await pdfjsLib.getDocument({data:b}).promise;let t='';
+      for(let p=1;p<=Math.min(d.numPages,5);p++){const pg=await d.getPage(p);const tc=await pg.getTextContent();t+=tc.items.map(i=>i.str).join(' ')+'\n'}
+      c+='\n--- '+f.name+' ---\n'+t.slice(0,8000)+'\n'}catch(e){c+='\n--- '+f.name+' [err]\n'}
+    }
+  }
+  return c?'\n\n=== REFS ===\n'+c:'';
+}
+
+function spj(text){
+  log('Raw AI response length: '+text.length+' chars');
+  log('First 200 chars: '+text.slice(0,200));
+  let s=text.replace(/`{1,3}json\s*/gi,'').replace(/`{1,3}\s*$/gm,'').trim();
+  const f=s.indexOf('['),l=s.lastIndexOf(']');
+  if(f<0||l<=f){log('No JSON array brackets found!','error');return[]}
+  s=s.slice(f,l+1);
+  log('Extracted JSON array, length: '+s.length);
+  try{const r=JSON.parse(s);log('Direct parse OK, '+r.length+' items');return r}catch(e){log('Direct parse failed: '+e.message,'warn')}
+  let out='',inS=false,es=false;
+  for(let i=0;i<s.length;i++){const c=s[i],cd=s.charCodeAt(i);
+    if(es){out+=c;es=false;continue}if(c==='\\'&&inS){es=true;out+=c;continue}
+    if(c==='"'){inS=!inS;out+=c;continue}
+    if(inS&&cd<32){if(c==='\n')out+='\\n';else if(c==='\r')out+='\\r';else if(c==='\t')out+='\\t';continue}
+    out+=c}
+  try{const r=JSON.parse(out);log('Fixed parse OK, '+r.length+' items');return r}catch(e2){log('Fixed parse failed: '+e2.message,'warn')}
+  try{const fn=new Function('return '+out);const r=fn();if(Array.isArray(r)){log('Eval parse OK, '+r.length+' items');return r}}catch(e3){log('Eval parse failed: '+e3.message,'error')}
+  log('ALL PARSE METHODS FAILED. Content: '+s.slice(0,500),'error');
+  return[];
+}
+
+// ═══ API ═══
+async function callGem(file,sp,key){
+  log('Gemini: converting PDF to base64...');
+  const b=await f2b(file);
+  log('Gemini: PDF base64 size='+b.length+' chars, sending...');
+  const url='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+key;
+  log('Gemini: POST to '+url.replace(key,'***'));
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({systemInstruction:{parts:[{text:sp}]},
+      contents:[{parts:[{inlineData:{mimeType:'application/pdf',data:b}},{text:'Analyze ALL pages of this engineering document. For each technical issue include "page" number (1-based). Be extremely thorough - check every connection, every designation, every parameter.'}]}],
+      generationConfig:{maxOutputTokens:8000,temperature:0.1}})});
+  log('Gemini: response status='+r.status);
+  if(!r.ok){const e=await r.text();log('Gemini ERROR: '+e.slice(0,500),'error');throw new Error('Gemini '+r.status+': '+e.slice(0,200))}
+  const d=await r.json();
+  log('Gemini: response received, candidates='+((d.candidates||[]).length));
+  if(d.candidates?.[0]?.finishReason)log('Gemini: finishReason='+d.candidates[0].finishReason);
+  const txt=d.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+  if(!txt){log('Gemini: EMPTY response text!','error');
+    if(d.promptFeedback)log('Gemini: promptFeedback='+JSON.stringify(d.promptFeedback),'warn');
+    return[]}
+  return spj(txt);
+}
+
+async function callCl(b64,sp,key){
+  log('Claude: sending image...');
+  const h={'Content-Type':'application/json'};if(key)h['x-api-key']=key;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:h,
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,system:sp,
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:'Find ALL technical issues. Be thorough.'}]}]})});
+  log('Claude: status='+r.status);
+  if(!r.ok){const e=await r.text();log('Claude ERROR: '+e.slice(0,300),'error');throw new Error('Claude '+r.status)}
+  const d=await r.json();const txt=(d.content||[]).map(b=>b.text||'').join('');
+  return spj(txt);
+}
+
+async function callGpt(b64,sp,key){
+  log('GPT: sending image...');
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'system',content:sp},
+      {role:'user',content:[{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64}},{type:'text',text:'Find ALL technical issues.'}]}]})});
+  log('GPT: status='+r.status);
+  if(!r.ok){const e=await r.text();log('GPT ERROR: '+e.slice(0,300),'error');throw new Error('GPT '+r.status)}
+  const d=await r.json();return spj(d.choices?.[0]?.message?.content||'[]');
+}
+
+// ═══ CHECK ═══
+async function runCheck(file){
+  const pv=S.config.active,key=gk(pv);
+  if(!key){S.error='Add API key for '+PROVS[pv].n+' in settings';render();return}
+  log('=== START CHECK === provider='+pv+', pages='+S.totalPages);
+  S.checking=true;S.progress=0;S.error='';S.status='Reading refs...';
+  S.pageStatuses={};S.comments=[];S.showComments=false;S.activeComment=null;S.elapsed=0;
+  if(S.eTimer)clearInterval(S.eTimer);
+  S.eTimer=setInterval(()=>{S.elapsed++;const el=document.getElementById('elapsed');if(el)el.textContent=ft(S.elapsed)},1000);
+  render();
+  try{
+    const ref=await readRefs();
+    log('Ref context length: '+ref.length);
+    const sp=SYS+S.customPrompt+ref;
+    log('System prompt length: '+sp.length);
+
+    if(pv==='gemini'){
+      S.status='Sending PDF to Gemini...';S.progress=15;render();
+      const res=await callGem(file,sp,key);
+      S.progress=95;render();
+      log('Gemini returned '+res.length+' issues');
+      let id=1;const all=[];
+      for(const r of res){
+        const item={id:id++,page:Math.max(1,Math.min(S.totalPages,parseInt(r.page)||1)),
+          x:Math.max(5,Math.min(95,Number(r.x)||50)),y:Math.max(5,Math.min(95,Number(r.y)||50)),
+          severity:['error','warning','info'].includes(r.severity)?r.severity:'info',
+          title:r.title||'Issue',text:r.text||'',status:'pending',userReply:'',provider:'gemini'};
+        log('Issue #'+item.id+' p'+item.page+' ['+item.severity+'] '+item.title.slice(0,60));
+        all.push(item);
+      }
+      S.comments=all;
+    }else{
+      const fn=pv==='claude'?callCl:callGpt;
+      S.status='Rendering pages...';render();
+      const pgs=[];
+      for(let p=1;p<=S.totalPages;p++){log('Rendering page '+p);pgs.push({page:p,b64:await p2b(S.pdfDoc,p)})}
+      S.progress=10;render();
+      const CO=Math.min(3,S.totalPages),ar=new Array(S.totalPages);let dn=0;
+      const q=[...pgs],ru=new Set();
+      await new Promise(res=>{
+        function nx(){if(!q.length&&!ru.size){res();return}
+          while(ru.size<CO&&q.length){const t=q.shift(),ix=t.page-1;
+            S.pageStatuses[t.page]={status:'analyzing',agent:pv};render();
+            const p=fn(t.b64,sp,key).then(r=>{ar[ix]=r;S.pageStatuses[t.page]={status:'done',count:(r||[]).length,agent:pv};log('Page '+t.page+': '+((r||[]).length)+' issues')})
+            .catch(e=>{ar[ix]=[];S.pageStatuses[t.page]={status:'error',agent:pv};log('Page '+t.page+' ERROR: '+e.message,'error')})
+            .finally(()=>{dn++;S.progress=10+(dn/S.totalPages)*90;S.status='Sheet '+dn+'/'+S.totalPages;ru.delete(p);render();nx()});
+            ru.add(p)}}
+        nx()});
+      let id=1;const all=[];
+      for(let i=0;i<ar.length;i++)for(const r of(ar[i]||[]))
+        all.push({id:id++,page:i+1,x:Math.max(5,Math.min(95,Number(r.x)||50)),y:Math.max(5,Math.min(95,Number(r.y)||50)),
+          severity:['error','warning','info'].includes(r.severity)?r.severity:'info',
+          title:r.title||'Issue',text:r.text||'',status:'pending',userReply:'',provider:pv});
+      S.comments=all;
+    }
+    S.showComments=true;S.progress=100;
+    log('=== CHECK DONE === total issues: '+S.comments.length);
+  }catch(err){log('CHECK FAILED: '+err.message,'error');S.error=err.message||'Error'}
+  clearInterval(S.eTimer);S.eTimer=null;S.checking=false;S.status='';S.pageStatuses={};render();
+}
+
+// ═══ PDF RENDER ═══
+function rpdf(cv,doc,num,zm){if(!doc||!cv)return;if(rTask)try{rTask.cancel()}catch(e){}
+  doc.getPage(num).then(pg=>{const s=(zm/100)*2,vp=pg.getViewport({scale:s});cv.width=vp.width;cv.height=vp.height;cv.style.width=(vp.width/2)+'px';cv.style.height=(vp.height/2)+'px';rTask=pg.render({canvasContext:cv.getContext('2d'),viewport:vp})})}
+
+// ═══ RENDER ═══
+function render(){
+  const app=document.getElementById('app'),s=S,ap=PROVS[s.config.active];
+  const pc=s.comments.filter(c=>c.page===s.page);
+  const st={total:s.comments.length,err:s.comments.filter(c=>c.severity==='error').length,
+    warn:s.comments.filter(c=>c.severity==='warning').length,inf:s.comments.filter(c=>c.severity==='info').length,
+    res:s.comments.filter(c=>c.status!=='pending').length};
+  let h='';
+
+  if(s.showSettings)h+=rndSet();
+
+  // Top
+  h+='<div class="top"><div class="top-l">';
+  h+='<div class="logo">\u2726</div><span class="brand">DocReview<b>AI</b></span>';
+  h+='<span class="tag">IEC\u00b7IEEE\u00b7ISO</span>';
+  if(s.pdfName)h+='<div class="sep"></div><span class="fname">'+esc(s.pdfName)+'</span>';
+  h+='</div><div class="top-r">';
+  if(s.showComments){h+='<div class="sts">';
+    h+='<div class="st"><div class="st-d" style="background:var(--ac)"></div><span style="color:var(--ac)">'+st.err+'</span></div>';
+    h+='<div class="st"><div class="st-d" style="background:var(--am)"></div><span style="color:var(--am)">'+st.warn+'</span></div>';
+    h+='<div class="st"><div class="st-d" style="background:var(--bl)"></div><span style="color:var(--bl)">'+st.inf+'</span></div>';
+    h+='<span class="st-t">'+st.res+'/'+st.total+'</span></div>'}
+  if(s.pdfDoc)h+='<div class="zm"><span>'+s.zoom+'%</span></div>';
+  h+='<button class="btn-prov" style="background:'+ap.c+'10;border:1px solid '+ap.c+'30;color:'+ap.c+'" onclick="openSet()">'+ap.i+' '+ap.n+' \u25be</button>';
+  h+='<button class="btn" onclick="pickF()">\u{1F4C4} '+(s.pdfDoc?'Other':'Load')+'</button>';
+  h+='<input type="file" id="fi" accept=".pdf" onchange="loadF(this)">';
+  if(s.pdfDoc&&!s.showComments)h+='<button class="btn-go" '+(s.checking?'disabled':'')+' onclick="go()">'+(s.checking?'...':'\u26a1 Check')+'</button>';
+  if(s.showComments)h+='<button class="btn" onclick="reset()">\u21ba</button>';
+  h+='</div></div>';
+
+  if(s.error)h+='<div class="err-bar"><span>'+esc(s.error)+'</span><div style="display:flex;gap:5px"><button class="btn" style="font-size:10px;padding:2px 6px" onclick="openSet()">Settings</button><button style="background:none;border:none;color:var(--ac);font-size:13px;cursor:pointer" onclick="S.error=\'\';render()">\u2715</button></div></div>';
+
+  h+='<div class="body">';
+
+  // Left panel
+  h+='<div class="left'+(s.leftOpen===false?' collapsed':'')+'">';
+  h+='<button class="left-tog" onclick="S.leftOpen=S.leftOpen===false;render()"><span style="font-size:12px;display:inline-block;transition:transform .2s;'+(s.leftOpen===false?'transform:rotate(180deg)':'')+'">&#x25C1;</span>'+(s.leftOpen!==false?'<span style="font-weight:600;font-size:11px">Panel</span>':'')+'</button>';
+  if(s.leftOpen!==false){
+    h+='<div class="left-body">';
+    // Refs
+    h+='<div class="left-sec"><div class="left-sec-title">Reference files</div>';
+    h+='<input type="file" id="ri" multiple accept=".pdf,.txt,.csv,.md,.json,.xml,.html" onchange="addR(this)">';
+    if(s.refFiles.length)h+='<div style="font-size:8px;color:var(--gn);font-family:var(--fm);text-align:center;margin-bottom:4px">\u2713 '+s.refFiles.length+' file(s) as context</div>';
+    s.refFiles.forEach((f,i)=>{h+='<div class="ref"><span style="font-size:10px">\u{1F4C4}</span><span class="n">'+esc(f.name)+'</span><span class="sz">'+(f.size/1024).toFixed(0)+'K</span><button class="rm" onclick="rmR('+i+')">\u2715</button></div>'});
+    h+='<button class="add-ref" onclick="document.getElementById(\'ri\').click()">+ Add</button>';
+    h+='</div>';
+    // Prompt
+    h+='<div class="prompt-area"><div class="left-sec-title">Review prompt</div>';
+    h+='<textarea class="prompt-ta" id="pta" onchange="S.customPrompt=this.value">'+esc(s.customPrompt)+'</textarea></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // Viewer
+  h+='<div class="viewer" id="viewer">';
+  if(!s.pdfDoc){
+    h+='<div class="upload-zone">';
+    if(s.loading)h+='<div style="text-align:center"><div class="spinner"></div><div style="font-size:12px;color:var(--tx2)">Loading...</div></div>';
+    else h+='<div class="ubox" onclick="pickF()"><div style="font-size:36px;margin-bottom:10px;opacity:.3">\u{1F4C4}</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">Upload PDF</div><div style="font-size:11px;color:var(--tx3);text-align:center;line-height:1.5;max-width:240px">Drag & drop or click</div><div style="font-size:9px;color:var(--tx3);font-family:var(--fm);margin-top:4px">Scroll=zoom \u2022 Drag=pan \u2022 RClick=next</div><div style="margin-top:14px;padding:6px 18px;border-radius:7px;background:var(--acs);color:var(--ac);font-size:11px;font-weight:600;border:1px solid rgba(196,68,37,.15)">Select</div></div>';
+    h+='</div>';
+  }else{
+    h+='<div class="vscroll" id="vs" oncontextmenu="return rcl(event)">';
+    if(s.checking){
+      h+='<div class="cov"><div class="cov-in">';
+      h+='<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px"><span style="font-size:16px">'+ap.i+'</span><span style="font-size:13px;font-weight:700">'+(s.config.active==='gemini'?'Gemini: full PDF':'Parallel analysis')+'</span>';
+      h+='<span class="ldots"><span style="background:'+ap.c+'"></span><span style="background:'+ap.c+'"></span><span style="background:'+ap.c+'"></span></span></div>';
+      h+='<div class="pbar"><div class="pfill" style="width:'+Math.min(s.progress,100)+'%;background:linear-gradient(90deg,'+ap.c+','+ap.c+'aa)"></div></div>';
+      h+='<div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:4px">'+esc(s.status)+'</div>';
+      h+='<div style="display:flex;align-items:center;justify-content:center;gap:10px">';
+      h+='<div style="font-size:22px;font-weight:800;color:var(--tx);font-family:var(--fm)">'+Math.min(~~s.progress,100)+'%</div>';
+      h+='<div id="elapsed" style="font-size:10px;color:var(--tx3);font-family:var(--fm)">'+ft(s.elapsed)+'</div></div>';
+      if(Object.keys(s.pageStatuses).length){
+        h+='<div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:10px">';
+        for(let p=1;p<=s.totalPages;p++){const ps=s.pageStatuses[p];
+          const bg=!ps?'var(--sf2)':ps.status==='done'?'var(--gns)':ps.status==='error'?'var(--acs)':'var(--bls)';
+          const bc=!ps?'var(--bd2)':ps.status==='done'?'rgba(36,130,90,.2)':ps.status==='error'?'rgba(196,68,37,.2)':'rgba(46,107,198,.2)';
+          const lb=!ps?p:ps.status==='analyzing'?'\u21bb':ps.status==='done'?'\u2713'+(ps.count||0):'\u2717';
+          h+='<div style="width:30px;height:22px;border-radius:3px;background:'+bg+';border:1px solid '+bc+';display:flex;align-items:center;justify-content:center;font-size:7px;font-family:var(--fm);font-weight:700">'+lb+'</div>'}
+        h+='</div>'}
+      if(s.refFiles.length)h+='<div style="font-size:8px;color:var(--gn);margin-top:6px">+'+s.refFiles.length+' ref files</div>';
+      h+='</div></div>';
+    }
+    h+='<div class="pdfwrap" id="pw"><div class="pdfbox" id="pb"><canvas id="cv"></canvas>';
+    if(s.showComments)pc.forEach((c,i)=>{
+      const cl=c.severity==='error'?'var(--ac)':c.severity==='warning'?'var(--am)':'var(--bl)';
+      const a=s.activeComment===c.id,sz=a?28:24;
+      h+='<div class="pin'+(a?' active':'')+'" style="left:'+c.x+'%;top:'+c.y+'%" onclick="event.stopPropagation();cpn('+c.id+')">';
+      if(a)h+='<div class="pin-p" style="border:2px solid '+cl+'"></div>';
+      h+='<div class="pin-d" style="width:'+sz+'px;height:'+sz+'px;background:'+(a?cl:'var(--sf)')+';border:2px solid '+cl+';color:'+(a?'#fff':cl)+';font-size:'+(a?11:10)+'px;box-shadow:'+(a?'0 0 16px '+cl+'55,var(--sh2)':'var(--sh)')+'">'+(i+1)+'</div></div>'});
+    h+='</div></div></div>';
+
+    // Bottom bar
+    h+='<div class="bbar">';
+    h+='<button class="pb" '+(s.page<=1?'disabled':'')+' onclick="gp(1)" title="First">\u23EE</button>';
+    h+='<button class="pb" '+(s.page<=1?'disabled':'')+' onclick="gp(S.page-1)" title="Prev">\u2039</button>';
+    h+='<div class="pg-sel"><div class="pg-cur" onclick="S.showPageDrop=!S.showPageDrop;render()">'+s.page+' <span style="font-size:7px;color:var(--tx3)">\u25be</span></div>';
+    if(s.showPageDrop){
+      h+='<div class="pg-drop" id="pgDrop">';
+      for(let p=1;p<=s.totalPages;p++)h+='<button class="'+(p===s.page?'cur':'')+'" onclick="S.showPageDrop=false;gp('+p+')">'+p+'</button>';
+      h+='</div>'}
+    h+='</div>';
+    h+='<span class="pg-tot">/ '+s.totalPages+'</span>';
+    h+='<button class="pb" '+(s.page>=s.totalPages?'disabled':'')+' onclick="gp(S.page+1)" title="Next">\u203A</button>';
+    h+='<button class="pb" '+(s.page>=s.totalPages?'disabled':'')+' onclick="gp(S.totalPages)" title="Last">\u23ED</button>';
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // Right panel
+  if(s.showComments){
+    h+='<div class="right">';
+    h+='<div class="r-head"><span class="t">Sheet '+s.page+'</span><span class="c">'+pc.length+' issues</span></div>';
+    h+='<div class="r-scroll" id="rScroll">';
+    if(!pc.length)h+='<div class="r-empty">No issues on this sheet</div>';
+    else pc.forEach(c=>{
+      const sv={error:{c:'var(--ac)',b:'var(--acs)',i:'\u2715',l:'Error'},warning:{c:'var(--am)',b:'var(--ams)',i:'!',l:'Warning'},info:{c:'var(--bl)',b:'var(--bls)',i:'i',l:'Info'}}[c.severity];
+      const a=s.activeComment===c.id,rs=c.status!=='pending';
+      const bc=rs?(c.status==='accepted'?'var(--gn)':'var(--tx3)'):sv.c;
+      h+='<div class="card'+(a&&!rs?' active':'')+(rs?' resolved':'')+'" id="cd-'+c.id+'" style="border-left:3px solid '+bc+';'+(a&&!rs?'box-shadow:0 2px 14px '+sv.c+'18;border-color:'+sv.c+'44':'')+'" '+(rs?'':'onclick="ccd('+c.id+')"')+'>';
+      if(rs){h+='<div style="display:flex;align-items:center;gap:5px"><span style="font-weight:700;font-size:14px;color:'+(c.status==='accepted'?'var(--gn)':'var(--tx3)')+'">'+(c.status==='accepted'?'\u2713':'\u2717')+'</span><span style="font-size:11px;color:var(--tx2)">'+(c.status==='accepted'?'Accepted':'Rejected')+'</span></div>';
+        h+='<div style="font-size:11px;color:var(--tx3);margin-top:3px">'+esc(c.title)+'</div>';
+        if(c.userReply)h+='<div style="font-size:10px;color:var(--tx3);margin-top:5px;font-style:italic">\u00ab'+esc(c.userReply)+'\u00bb</div>';
+      }else{
+        h+='<div class="card-hd"><span class="card-sv" style="background:'+sv.b+';color:'+sv.c+'">'+sv.i+'</span><span class="card-sl" style="color:'+sv.c+'">'+sv.l+'</span>';
+        if(c.provider)h+='<span class="card-pr">'+PROVS[c.provider].i+' '+PROVS[c.provider].n+'</span>';
+        h+='</div><div class="card-tt">'+esc(c.title)+'</div><div class="card-tx">'+esc(c.text)+'</div>';
+        h+='<div class="card-acts"><button class="card-b card-ba" onclick="event.stopPropagation();acc('+c.id+')">\u2713 OK</button><button class="card-b card-br" onclick="event.stopPropagation();rej('+c.id+')">\u2717 No</button></div>'}
+      h+='</div>'});
+    h+='</div>';
+    if(st.res>0)h+='<div class="pfooter"><div class="pfooter-bar"><div class="pfooter-fill" style="width:'+(st.res/st.total*100)+'%"></div></div><div class="pfooter-tx">'+st.res+'/'+st.total+'</div></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  app.innerHTML=h;
+  if(s.pdfDoc){const cv=document.getElementById('cv');if(cv)rpdf(cv,s.pdfDoc,s.page,s.zoom)}
+  if(s.activeComment!=null){const el=document.getElementById('cd-'+s.activeComment);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})}
+  setupPan();
+}
+
+function rndSet(){
+  const c=S.config,tab=S.settingsTab;
+  let h='<div class="mbg" onclick="closeSet()"><div class="mdl" onclick="event.stopPropagation()">';
+  h+='<div class="mdl-h"><div><h2>Settings</h2><p>Providers, keys, and debug log</p></div><button class="mdl-cl" onclick="closeSet()">\u2715</button></div>';
+  h+='<div class="mdl-b">';
+  // Tabs
+  h+='<div class="tabs">';
+  h+='<button class="tab'+(tab==='providers'?' active':'')+'" onclick="S.settingsTab=\'providers\';render()">Providers</button>';
+  h+='<button class="tab'+(tab==='log'?' active':'')+'" onclick="S.settingsTab=\'log\';render()">Debug Log</button>';
+  h+='</div>';
+
+  if(tab==='providers'){
+    h+='<div class="sl">Active provider</div><div class="pvg">';
+    Object.entries(PROVS).forEach(([id,p])=>{
+      h+='<button class="pvc'+(c.active===id?' sel':'')+'" style="'+(c.active===id?'border-color:'+p.c+';background:'+p.c+'0a':'color:var(--tx2)')+'" onclick="selPv(\''+id+'\')">';
+      h+='<div class="ic">'+p.i+'</div><div class="nm" style="color:'+(c.active===id?p.c:'var(--tx2)')+'">'+p.n+'</div>';
+      if(p.rec)h+='<div class="rc" style="color:'+p.c+'">recommended</div>';
+      h+='</button>'});
+    h+='</div>';
+    h+='<div class="ib" style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.12)"><h4 style="color:#3B82F6">\u{1F535} Gemini</h4><p>Sends entire PDF natively. One request, full resolution. Fast.</p></div>';
+    Object.entries(PROVS).forEach(([id,p])=>{
+      h+='<div class="ks"><div class="ks-h"><div class="ks-hl"><span style="font-size:13px">'+p.i+'</span><span style="font-size:11px;font-weight:700">'+p.n+'</span><span style="font-size:9px;color:var(--tx3)">'+p.d+'</span></div>';
+      h+='<button class="ks-add" style="background:'+p.c+'10;border-color:'+p.c+'30;color:'+p.c+'" onclick="addK(\''+id+'\')">+ Key</button></div>';
+      const keys=c.keys[id]||[];
+      if(!keys.length)h+='<div class="ks-e">Add API key</div>';
+      keys.forEach((k,i)=>{
+        h+='<div class="kr"><button class="kt'+(k.active?' on':'')+'" style="'+(k.active?'border-color:'+p.c+';background:'+p.c:'border-color:var(--bd)')+';color:#fff" onclick="togK(\''+id+'\','+i+')">'+(k.active?'\u2713':'')+'</button>';
+        h+='<input class="kl" value="'+esc(k.label)+'" placeholder="Label" onchange="upK(\''+id+'\','+i+',\'label\',this.value)">';
+        h+='<input class="ki" type="password" value="'+esc(k.key)+'" placeholder="'+(id==='gemini'?'AIza...':id==='claude'?'sk-ant-...':'sk-...')+'" onchange="upK(\''+id+'\','+i+',\'key\',this.value)">';
+        h+='<button class="kd" onclick="rmK(\''+id+'\','+i+')">\u2715</button></div>'});
+      h+='</div>'});
+  }else{
+    h+='<div class="sl">API Exchange Log</div>';
+    h+='<textarea class="log-area" id="logArea" readonly>'+esc(S.logs.join('\n'))+'</textarea>';
+    h+='<button class="btn" style="margin-top:8px" onclick="S.logs=[];render()">Clear log</button>';
+  }
+  h+='</div><div class="mdl-f"><button class="btn" onclick="closeSet()">Close</button></div></div></div>';
+  return h;
+}
+
+// ═══ PAN & ZOOM ═══
+let isDrag=false,dsx=0,dsy=0,ssx=0,ssy=0;
+function setupPan(){
+  const el=document.getElementById('vs');if(!el)return;
+  el.onmousedown=function(e){if(e.button!==0||e.target.closest('.pin'))return;
+    isDrag=true;dsx=e.clientX;dsy=e.clientY;ssx=el.scrollLeft;ssy=el.scrollTop;
+    el.classList.add('dragging');e.preventDefault()};
+}
+document.addEventListener('mousemove',function(e){if(!isDrag)return;
+  const el=document.getElementById('vs');if(!el)return;
+  el.scrollLeft=ssx-(e.clientX-dsx);el.scrollTop=ssy-(e.clientY-dsy)});
+document.addEventListener('mouseup',function(){if(isDrag){isDrag=false;const el=document.getElementById('vs');if(el)el.classList.remove('dragging')}});
+
+document.addEventListener('wheel',function(e){
+  if(!S.pdfDoc)return;const v=document.getElementById('vs');
+  if(!v||!v.contains(e.target))return;e.preventDefault();
+  const old=S.zoom,d=e.deltaY>0?-8:8,nz=Math.max(25,Math.min(400,old+d));
+  if(nz===old)return;
+  const r=v.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top;
+  const px=(v.scrollLeft+cx),py=(v.scrollTop+cy),sc=nz/old;
+  S.zoom=nz;
+  const cv=document.getElementById('cv');if(cv)rpdf(cv,S.pdfDoc,S.page,nz);
+  const zm=document.querySelector('.zm span');if(zm)zm.textContent=nz+'%';
+  requestAnimationFrame(()=>{v.scrollLeft=px*sc-cx;v.scrollTop=py*sc-cy});
+},{passive:false});
+
+function rcl(e){e.preventDefault();if(S.page<S.totalPages){S.page++;S.activeComment=null;S.showPageDrop=false;render()}return false}
+
+// ═══ ACTIONS ═══
+function pickF(){document.getElementById('fi').click()}
+async function loadF(inp){const f=inp.files?.[0];if(!f)return;S.loading=true;S.pdfName=f.name;render();
+  try{origFile=f;const b=await f.arrayBuffer();const d=await pdfjsLib.getDocument({data:b}).promise;
+    S.pdfDoc=d;S.totalPages=d.numPages;S.page=1;S.zoom=100;S.showComments=false;S.comments=[];S.activeComment=null;S.error='';
+    log('PDF loaded: '+f.name+', '+d.numPages+' pages')}
+  catch(e){S.error='Cannot open PDF';log('PDF load error: '+e.message,'error')}
+  S.loading=false;inp.value='';render()}
+function addR(inp){S.refFiles=[...S.refFiles,...Array.from(inp.files||[])];inp.value='';render()}
+function rmR(i){S.refFiles=S.refFiles.filter((_,j)=>j!==i);render()}
+function gp(p){p=Math.max(1,Math.min(S.totalPages,~~p));if(p!==S.page){S.page=p;S.activeComment=null;S.showPageDrop=false;render()}}
+function cpn(id){S.activeComment=S.activeComment===id?null:id;render()}
+function ccd(id){S.activeComment=S.activeComment===id?null:id;render()}
+function acc(id){S.comments=S.comments.map(c=>c.id===id?{...c,status:'accepted'}:c);S.activeComment=null;render()}
+function rej(id){const r=prompt('Why disagree?');if(r!==null){S.comments=S.comments.map(c=>c.id===id?{...c,status:'rejected',userReply:r}:c);S.activeComment=null;render()}}
+function go(){if(origFile)runCheck(origFile)}
+function reset(){S.showComments=false;S.comments=[];S.activeComment=null;S.error='';render()}
+function openSet(){S.showSettings=true;render()}
+function closeSet(){S.showSettings=false;render()}
+function selPv(id){S.config.active=id;render()}
+function addK(p){if(!S.config.keys[p])S.config.keys[p]=[];S.config.keys[p].push({label:'Key '+(S.config.keys[p].length+1),key:'',active:true});render()}
+function togK(p,i){S.config.keys[p][i].active=!S.config.keys[p][i].active;render()}
+function upK(p,i,f,v){S.config.keys[p][i][f]=v}
+function rmK(p,i){S.config.keys[p]=S.config.keys[p].filter((_,j)=>j!==i);render()}
+
+// Click outside page dropdown closes it
+document.addEventListener('click',function(e){if(S.showPageDrop&&!e.target.closest('.pg-sel')){S.showPageDrop=false;render()}});
+
+// Drag & drop
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',async e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];
+  if(f&&f.type==='application/pdf'){S.loading=true;S.pdfName=f.name;render();
+    try{origFile=f;const b=await f.arrayBuffer();const d=await pdfjsLib.getDocument({data:b}).promise;
+      S.pdfDoc=d;S.totalPages=d.numPages;S.page=1;S.zoom=100;S.showComments=false;S.comments=[];S.activeComment=null;S.error='';
+      log('PDF dropped: '+f.name)}
+    catch(e){S.error='Cannot open PDF'}S.loading=false;render()}});
+
+render();
+</script>
+</body>
+</html>
