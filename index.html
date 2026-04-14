@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocReview AI</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+
+:root {
+  --bg:#F2EFEA;--surface:#FFF;--surface-alt:#F8F6F2;
+  --border:#DED9D1;--border-lt:#EBE8E2;
+  --text:#1A1A1A;--text-sec:#5F5A53;--text-ter:#9A948B;
+  --accent:#C44425;--accent-soft:rgba(196,68,37,.07);
+  --blue:#2E6BC6;--blue-soft:rgba(46,107,198,.06);
+  --green:#24825A;--green-soft:rgba(36,130,90,.06);
+  --amber:#B87314;--amber-soft:rgba(184,115,20,.06);
+  --shadow:0 1px 3px rgba(0,0,0,.05),0 6px 20px rgba(0,0,0,.03);
+  --shadow-lg:0 4px 12px rgba(0,0,0,.05),0 16px 40px rgba(0,0,0,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.03);border-radius:3px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-ter)}
+input[type=file]{display:none}
+button{font-family:inherit;cursor:pointer}
+textarea{font-family:inherit}
+
+.app{display:flex;flex-direction:column;height:100vh}
+.topbar{height:54px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:8px}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#E06A3E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
+.brand{font-size:15px;font-weight:800;letter-spacing:-.03em}
+.brand b{color:var(--accent);font-weight:800}
+.badge{font-size:9px;color:var(--text-ter);font-family:'DM Mono',monospace;background:var(--surface-alt);padding:2px 6px;border-radius:4px;border:1px solid var(--border-lt)}
+.sep{height:18px;width:1px;background:var(--border)}
+.filename{font-size:12px;color:var(--text-ter);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.btn{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface-alt);color:var(--text-sec);transition:all .15s}
+.btn:hover{border-color:var(--text-ter)}
+.btn-accent{background:linear-gradient(135deg,var(--accent),#E06A3E);color:#fff;border:none;font-weight:700;padding:6px 16px}
+.btn-accent:disabled{background:var(--border);color:var(--text-ter);cursor:default}
+.btn-provider{font-family:'DM Mono',monospace;font-weight:700;font-size:11px;border-radius:7px;padding:5px 10px;display:flex;align-items:center;gap:4px}
+.zoom-badge{display:flex;align-items:center;background:var(--surface-alt);border-radius:7px;padding:2px 6px;border:1px solid var(--border)}
+.zoom-badge span{font-size:10px;color:var(--text-ter);font-family:'DM Mono',monospace;min-width:36px;text-align:center}
+
+.stats{display:flex;align-items:center;gap:10px;margin-right:4px}
+.stat{display:flex;align-items:center;gap:3px}
+.stat-dot{width:6px;height:6px;border-radius:50%}
+.stat span{font-size:11px;font-weight:700;font-family:'DM Mono',monospace}
+.stat-total{font-size:10px;color:var(--text-ter);font-family:'DM Mono',monospace}
+
+.error-bar{background:var(--accent-soft);border-bottom:1px solid rgba(196,68,37,.2);padding:8px 16px;display:flex;align-items:center;justify-content:space-between}
+.error-bar span{font-size:12px;color:var(--accent);font-weight:600}
+
+.body{display:flex;flex:1;overflow:hidden}
+
+.sidebar{width:210px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .3s}
+.sidebar.collapsed{width:42px}
+.sidebar-toggle{background:none;border:none;color:var(--text-sec);padding:11px 13px;text-align:left;font-size:13px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--border-lt);width:100%}
+.sidebar-content{padding:8px;flex:1;overflow:auto}
+.ref-file{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--surface-alt);border-radius:6px;border:1px solid var(--border-lt);margin-bottom:4px;animation:fadeUp .3s}
+.ref-file .name{font-size:10px;color:var(--text-sec);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-file .size{font-size:9px;color:var(--text-ter)}
+.ref-file .remove{background:none;border:none;color:var(--text-ter);font-size:11px;padding:1px;flex-shrink:0}
+.add-ref{width:100%;padding:8px 0;border-radius:6px;border:1px dashed var(--border);background:none;color:var(--text-ter);font-size:11px;margin-top:2px}
+.ref-hint{font-size:9px;color:var(--text-ter);text-align:center;margin-top:6px;line-height:1.4}
+.ref-status{font-size:9px;color:var(--green);padding:4px 0 6px;font-family:'DM Mono',monospace;text-align:center}
+
+.viewer{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.viewer-scroll{flex:1;overflow:auto;position:relative;background:var(--bg);cursor:grab}
+.viewer-scroll.dragging{cursor:grabbing}
+.viewer-scroll::-webkit-scrollbar{width:8px;height:8px}
+.viewer-scroll::-webkit-scrollbar-track{background:rgba(0,0,0,.04)}
+.viewer-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:padding-box}
+.viewer-scroll::-webkit-scrollbar-thumb:hover{background:var(--text-ter);background-clip:padding-box}
+.pdf-wrap{padding:24px;display:flex;justify-content:center;min-height:100%;min-width:100%}
+.pdf-container{position:relative;box-shadow:var(--shadow-lg);border-radius:4px;overflow:visible;background:#fff;line-height:0;flex-shrink:0}
+
+.upload-zone{flex:1;display:flex;align-items:center;justify-content:center}
+.upload-box{display:flex;flex-direction:column;align-items:center;padding:44px;border:2px dashed var(--border);border-radius:16px;cursor:pointer;max-width:400px;width:100%;transition:border-color .2s}
+.upload-box:hover{border-color:var(--accent)}
+.upload-icon{font-size:40px;margin-bottom:12px;opacity:.3}
+.upload-title{font-size:16px;font-weight:700;margin-bottom:5px}
+.upload-hint{font-size:12px;color:var(--text-ter);text-align:center;line-height:1.6;max-width:260px}
+.upload-shortcut{margin-top:5px;font-size:10px;color:var(--text-ter);font-family:'DM Mono',monospace}
+.upload-btn{margin-top:16px;padding:7px 20px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600;border:1px solid rgba(196,68,37,.16)}
+
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+
+.check-overlay{position:absolute;inset:0;background:rgba(242,239,234,.92);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;flex-direction:column}
+.check-inner{width:380px;text-align:center}
+.progress-bar{width:100%;height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:14px}
+.progress-fill{height:100%;border-radius:3px;transition:width .4s}
+
+.pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10}
+.pin.active{z-index:100}
+.pin-pulse{position:absolute;top:50%;left:50%;width:42px;height:42px;border-radius:50%;opacity:.4;transform:translate(-50%,-50%);animation:pinPulse 1.6s ease-in-out infinite}
+.pin-dot{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'DM Mono',monospace;transition:all .3s cubic-bezier(.34,1.56,.64,1)}
+
+/* Bottom bar - Acrobat style */
+.bottombar{height:36px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:4px;background:var(--surface);flex-shrink:0;padding:0 12px}
+.pg-btn{width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text-sec);font-size:11px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace}
+.pg-btn:hover{background:var(--surface-alt)}
+.pg-btn.current{background:var(--accent);color:#fff;border:none;font-weight:700}
+.pg-input{width:44px;height:26px;border:1px solid var(--border);border-radius:5px;text-align:center;font-size:11px;font-family:'DM Mono',monospace;outline:none;color:var(--text)}
+.pg-input:focus{border-color:var(--accent)}
+.pg-total{font-size:11px;color:var(--text-ter);font-family:'DM Mono',monospace;margin:0 2px}
+
+/* Prompt area */
+.prompt-section{padding:10px 14px;border-bottom:1px solid var(--border-lt);background:var(--surface-alt)}
+.prompt-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--text);outline:none;line-height:1.5;resize:vertical;min-height:48px;max-height:120px}
+.prompt-input:focus{border-color:var(--accent)}
+.prompt-label{font-size:10px;color:var(--text-ter);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+.comments{width:340px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.comments-header{padding:12px 14px;border-bottom:1px solid var(--border-lt);display:flex;align-items:center;justify-content:space-between}
+.comments-header .title{font-size:13px;font-weight:700}
+.comments-header .count{font-size:10px;color:var(--text-ter);font-family:'DM Mono',monospace}
+.comments-scroll{flex:1;overflow:auto;padding:10px}
+.comments-empty{text-align:center;padding:28px;color:var(--text-ter);font-size:12px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;transition:all .25s;cursor:pointer;scroll-margin-top:8px;animation:fadeUp .3s}
+.card.active{background:var(--surface-alt);padding:16px}
+.card.resolved{opacity:.5;cursor:default}
+.card-header{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.card-sev{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;font-size:10px;font-weight:800}
+.card-sev-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'DM Mono',monospace}
+.card-provider{font-size:9px;color:var(--text-ter);margin-left:auto;font-family:'DM Mono',monospace;background:var(--surface-alt);padding:1px 5px;border-radius:3px;border:1px solid var(--border-lt)}
+.card-title{font-size:13px;font-weight:700;line-height:1.45;margin-bottom:8px}
+.card-text{font-size:12px;color:var(--text-sec);line-height:1.7;margin-bottom:14px;white-space:pre-line}
+.card-actions{display:flex;gap:6px}
+.card-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 10px;border-radius:7px;font-size:11.5px;font-weight:600;transition:all .15s}
+.card-btn-accept{background:var(--green-soft);color:var(--green);border:1px solid rgba(36,130,90,.13)}
+.card-btn-reject{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(196,68,37,.13)}
+
+.progress-footer{padding:9px 14px;border-top:1px solid var(--border-lt);background:var(--surface-alt)}
+.progress-footer-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:5px}
+.progress-footer-fill{height:100%;background:var(--green);border-radius:2px;transition:width .4s}
+.progress-footer-text{font-size:10px;color:var(--text-ter);text-align:center}
+
+/* Loading animation */
+.loading-dots{display:inline-flex;gap:4px;vertical-align:middle;margin-left:6px}
+.loading-dots span{width:6px;height:6px;border-radius:50%;animation:dotPulse 1.4s ease-in-out infinite}
+.loading-dots span:nth-child(2){animation-delay:.2s}
+.loading-dots span:nth-child(3){animation-delay:.4s}
+
+.elapsed{font-size:10px;color:var(--text-ter);font-family:'DM Mono',monospace;margin-top:8px}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.2);backdrop-filter:blur(4px)}
+.modal{width:540px;max-height:85vh;background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-head h2{font-size:15px;font-weight:800}
+.modal-head p{font-size:11px;color:var(--text-ter);margin-top:2px}
+.modal-close{background:none;border:none;color:var(--text-ter);font-size:18px}
+.modal-body{flex:1;overflow:auto;padding:20px}
+.modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+.prov-grid{display:flex;gap:6px;margin-bottom:20px}
+.prov-card{flex:1;padding:10px 8px;border-radius:8px;text-align:center;transition:all .2s;border:2px solid var(--border-lt);background:var(--surface-alt)}
+.prov-card.selected{border-color:currentColor}
+.prov-card .icon{font-size:18px}
+.prov-card .name{font-size:11px;font-weight:700;margin-top:3px}
+.prov-card .rec{font-size:9px;margin-top:2px}
+
+.info-box{padding:12px;border-radius:8px;margin-bottom:16px}
+.info-box h4{font-size:12px;font-weight:600;margin-bottom:4px}
+.info-box p{font-size:11px;color:var(--text-sec);line-height:1.5}
+
+.section-label{font-size:11px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+
+.key-section{margin-bottom:14px;padding:12px;background:var(--surface-alt);border-radius:10px;border:1px solid var(--border-lt)}
+.key-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.key-header-left{display:flex;align-items:center;gap:6px}
+.key-add{padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid}
+.key-empty{font-size:10px;color:var(--text-ter);padding:6px 0;text-align:center}
+.key-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;padding:5px 7px;background:var(--surface);border-radius:6px;border:1px solid var(--border-lt)}
+.key-toggle{width:16px;height:16px;border-radius:3px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
+.key-toggle.on{background:currentColor}
+.key-label{width:70px;background:none;border:none;outline:none;font-size:10px;font-weight:600;color:var(--text)}
+.key-input{flex:1;background:var(--surface-alt);border:1px solid var(--border-lt);border-radius:4px;padding:3px 6px;font-size:10px;color:var(--text);outline:none;font-family:'DM Mono',monospace}
+.key-remove{background:none;border:none;color:var(--text-ter);font-size:12px;padding:1px;flex-shrink:0}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pinPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.4}50%{transform:translate(-50%,-50%) scale(1.7);opacity:0}}
+@keyframes dotPulse{0%,80%,100%{transform:scale(.4);opacity:.3}40%{transform:scale(1);opacity:1}}
+</style>
+</head><body><div class="app" id="app"></div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PROVIDERS={
+  gemini:{name:'Gemini',icon:'\u{1F535}',color:'#3B82F6',desc:'Google Gemini 2.5 Flash',needsKey:true,recommended:true},
+  claude:{name:'Claude',icon:'\u{1F7E0}',color:'#D97706',desc:'Anthropic Claude Sonnet 4',needsKey:true},
+  gpt:{name:'GPT',icon:'\u{1F7E2}',color:'#10B981',desc:'OpenAI GPT-4o Vision',needsKey:true},
+};
+
+const DEFAULT_PROMPT=`Focus on TECHNICAL issues only: wrong connections, incorrect parameters, missing calculations, standard violations (IEC, IEEE, ISO).
+DO NOT comment on: title blocks, stamps, formatting, signatures, dates, line weights, fonts.
+For electrical schematics: check connections, designations (IEC 81346), protection coordination, voltages (IEC 60038), short-circuit (IEC 60909).
+For drawings: check dimensions, materials, fire safety widths, structural clearances.
+Be extremely thorough - analyze every element visible on the drawing.`;
+
+const SYSTEM_BASE=`You are an expert engineering document reviewer specializing in IEC, IEEE, ISO standards.
+Return a JSON array of issues found. Each issue:
+[{"severity":"error|warning|info","title":"Standard: Brief title","text":"Detailed description","x":0-100,"y":0-100,"page":N}]
+x,y = percentage position on page. Return ONLY valid JSON array. Respond in Russian.
+If no issues: return [].
+
+USER INSTRUCTIONS:
+`;
+
+let state={
+  pdfDoc:null,pdfName:'',totalPages:0,page:1,zoom:100,
+  panX:0,panY:0,
+  refFiles:[],sidebarOpen:true,
+  comments:[],showComments:false,activeComment:null,
+  checking:false,progress:0,status:'',pageStatuses:{},
+  elapsed:0,elapsedTimer:null,
+  error:'',
+  showSettings:false,
+  customPrompt:DEFAULT_PROMPT,
+  config:{active:'gemini',keys:{gemini:[],claude:[],gpt:[]}}
+};
+
+let originalPdfFile=null,renderTaskRef=null;
+
+// ═══ HELPERS ═══
+function getKeys(p){return(state.config.keys[p]||[]).filter(k=>k.active&&k.key.trim())}
+function getKey(p){const ks=getKeys(p);return ks.length?ks[~~(Math.random()*ks.length)].key:null}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+async function pageToBase64(doc,num){
+  const pg=await doc.getPage(num);
+  const vp=pg.getViewport({scale:1.2});
+  const cv=document.createElement('canvas');
+  cv.width=vp.width;cv.height=vp.height;
+  await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+  return cv.toDataURL('image/jpeg',0.6).split(',')[1];
+}
+async function pdfToBase64(file){
+  return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(file)});
+}
+async function readRefFiles(){
+  let ctx='';
+  for(const file of state.refFiles){
+    if(/\.(txt|csv|md|json|xml|html?)$/i.test(file.name)){
+      const t=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=()=>r('');fr.readAsText(file)});
+      ctx+='\n--- '+file.name+' ---\n'+t.slice(0,8000)+'\n';
+    }else if(/\.pdf$/i.test(file.name)){
+      try{const buf=await file.arrayBuffer();const doc=await pdfjsLib.getDocument({data:buf}).promise;let t='';
+      for(let p=1;p<=Math.min(doc.numPages,5);p++){const pg=await doc.getPage(p);const tc=await pg.getTextContent();t+=tc.items.map(i=>i.str).join(' ')+'\n'}
+      ctx+='\n--- '+file.name+' ---\n'+t.slice(0,8000)+'\n'}catch(e){ctx+='\n--- '+file.name+' [error]\n'}
+    }
+  }
+  return ctx?'\n\n=== REFERENCE DOCS ===\n'+ctx:'';
+}
+
+function safeParseJson(text){
+  let s=text.replace(/`{1,3}json\s*/gi,'').replace(/`{1,3}\s*$/gm,'').trim();
+  const f=s.indexOf('['),l=s.lastIndexOf(']');
+  if(f>=0&&l>f)s=s.slice(f,l+1);else return[];
+  try{return JSON.parse(s)}catch(e){}
+  let out='',inStr=false,esc=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i],code=s.charCodeAt(i);
+    if(esc){out+=c;esc=false;continue}
+    if(c==='\\'&&inStr){esc=true;out+=c;continue}
+    if(c==='"'){inStr=!inStr;out+=c;continue}
+    if(inStr&&code<32){if(c==='\n')out+='\\n';else if(c==='\r')out+='\\r';else if(c==='\t')out+='\\t';continue}
+    out+=c;
+  }
+  try{return JSON.parse(out)}catch(e2){}
+  try{const fn=new Function('return '+out);const r=fn();if(Array.isArray(r))return r}catch(e3){}
+  console.error('JSON parse failed:',s.slice(0,300));return[];
+}
+
+// ═══ API CALLS ═══
+async function callGeminiPdf(pdfFile,sysPrompt,apiKey){
+  const b64=await pdfToBase64(pdfFile);
+  const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+apiKey,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      systemInstruction:{parts:[{text:sysPrompt}]},
+      contents:[{parts:[
+        {inlineData:{mimeType:'application/pdf',data:b64}},
+        {text:'Analyze ALL pages. For each technical issue include "page" number. Be thorough.'}
+      ]}],
+      generationConfig:{maxOutputTokens:8000,temperature:0.2},
+    }),
+  });
+  if(!r.ok)throw new Error('Gemini '+r.status+': '+(await r.text()).slice(0,200));
+  const d=await r.json();
+  return safeParseJson(d.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'[]');
+}
+
+async function callClaudePage(b64,sysPrompt,apiKey){
+  const h={'Content-Type':'application/json'};if(apiKey)h['x-api-key']=apiKey;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:h,
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,system:sysPrompt,
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:'Analyze this sheet. Find TECHNICAL issues only.'}]}]})});
+  if(!r.ok)throw new Error('Claude '+r.status+': '+(await r.text()).slice(0,200));
+  const d=await r.json();return safeParseJson((d.content||[]).map(b=>b.text||'').join(''));
+}
+
+async function callGPTPage(b64,sysPrompt,apiKey){
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+    body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'system',content:sysPrompt},
+      {role:'user',content:[{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64}},{type:'text',text:'Analyze. Find TECHNICAL issues only.'}]}]})});
+  if(!r.ok)throw new Error('GPT '+r.status+': '+(await r.text()).slice(0,200));
+  const d=await r.json();return safeParseJson(d.choices?.[0]?.message?.content||'[]');
+}
+
+// ═══ CHECK ═══
+async function runCheck(pdfFile){
+  const prov=state.config.active,apiKey=getKey(prov);
+  if(!apiKey){state.error='Add API key for '+PROVIDERS[prov].name;render();return}
+  state.checking=true;state.progress=0;state.error='';state.status='Reading reference files...';
+  state.pageStatuses={};state.comments=[];state.showComments=false;state.activeComment=null;
+  state.elapsed=0;
+  if(state.elapsedTimer)clearInterval(state.elapsedTimer);
+  state.elapsedTimer=setInterval(()=>{state.elapsed++;renderElapsed()},1000);
+  render();
+  try{
+    const refCtx=await readRefFiles();
+    const sysPrompt=SYSTEM_BASE+state.customPrompt+refCtx;
+    if(prov==='gemini'){
+      state.status='Sending entire PDF to Gemini...';state.progress=15;render();
+      const results=await callGeminiPdf(pdfFile,sysPrompt,apiKey);
+      state.progress=95;render();
+      let id=1;const all=[];
+      for(const r of(Array.isArray(results)?results:[])){
+        all.push({id:id++,page:Math.max(1,Math.min(state.totalPages,parseInt(r.page)||1)),
+          x:Math.max(5,Math.min(95,Number(r.x)||50)),y:Math.max(5,Math.min(95,Number(r.y)||50)),
+          severity:['error','warning','info'].includes(r.severity)?r.severity:'info',
+          title:r.title||'Issue',text:r.text||'',status:'pending',userReply:'',provider:'gemini'});
+      }
+      state.comments=all;
+    }else{
+      const callFn=prov==='claude'?callClaudePage:callGPTPage;
+      state.status='Rendering pages...';render();
+      const pages=[];
+      for(let p=1;p<=state.totalPages;p++)pages.push({page:p,b64:await pageToBase64(state.pdfDoc,p)});
+      state.progress=10;render();
+      const CONC=Math.min(3,state.totalPages);
+      const allRes=new Array(state.totalPages);let done=0;
+      const queue=[...pages],running=new Set();
+      await new Promise(resolve=>{
+        function next(){
+          if(!queue.length&&!running.size){resolve();return}
+          while(running.size<CONC&&queue.length){
+            const t=queue.shift(),idx=t.page-1;
+            state.pageStatuses[t.page]={status:'analyzing',agent:prov};render();
+            const p=callFn(t.b64,sysPrompt,apiKey).then(res=>{
+              allRes[idx]=res;state.pageStatuses[t.page]={status:'done',count:(res||[]).length,agent:prov};
+            }).catch(err=>{allRes[idx]=[];state.pageStatuses[t.page]={status:'error',agent:prov};console.error(err);
+            }).finally(()=>{done++;state.progress=10+(done/state.totalPages)*90;
+              state.status='Sheet '+done+'/'+state.totalPages;running.delete(p);render();next()});
+            running.add(p);
+          }
+        }
+        next();
+      });
+      let id=1;const all=[];
+      for(let i=0;i<allRes.length;i++)for(const r of(allRes[i]||[]))
+        all.push({id:id++,page:i+1,x:Math.max(5,Math.min(95,Number(r.x)||50)),y:Math.max(5,Math.min(95,Number(r.y)||50)),
+          severity:['error','warning','info'].includes(r.severity)?r.severity:'info',
+          title:r.title||'Issue',text:r.text||'',status:'pending',userReply:'',provider:prov});
+      state.comments=all;
+    }
+    state.showComments=true;state.progress=100;
+  }catch(err){console.error(err);state.error=err.message||'Error'}
+  clearInterval(state.elapsedTimer);state.elapsedTimer=null;
+  state.checking=false;state.status='';state.pageStatuses={};render();
+}
+
+// ═══ PDF RENDER ═══
+function renderPdfPage(canvas,doc,num,zoom){
+  if(!doc||!canvas)return;
+  if(renderTaskRef)try{renderTaskRef.cancel()}catch(e){}
+  doc.getPage(num).then(pg=>{
+    const s=(zoom/100)*2;const vp=pg.getViewport({scale:s});
+    canvas.width=vp.width;canvas.height=vp.height;
+    canvas.style.width=(vp.width/2)+'px';canvas.style.height=(vp.height/2)+'px';
+    renderTaskRef=pg.render({canvasContext:canvas.getContext('2d'),viewport:vp});
+  });
+}
+
+function renderElapsed(){
+  const el=document.getElementById('elapsed');
+  if(el){const m=~~(state.elapsed/60),s=state.elapsed%60;el.textContent=(m?m+'m ':'')+s+'s'}
+}
+
+function fmtTime(sec){const m=~~(sec/60),s=sec%60;return(m?m+'m ':'')+(s<10&&m?'0':'')+s+'s'}
+
+// ═══ RENDER ═══
+function render(){
+  const s=state,app=document.getElementById('app');
+  const ap=PROVIDERS[s.config.active];
+  const pgC=s.comments.filter(c=>c.page===s.page);
+  const stats={total:s.comments.length,errors:s.comments.filter(c=>c.severity==='error').length,
+    warnings:s.comments.filter(c=>c.severity==='warning').length,infos:s.comments.filter(c=>c.severity==='info').length,
+    resolved:s.comments.filter(c=>c.status!=='pending').length};
+  let h='';
+
+  // Settings modal
+  if(s.showSettings)h+=renderSettings();
+
+  // Topbar
+  h+='<div class="topbar"><div class="topbar-left">';
+  h+='<div class="logo">\u2726</div><span class="brand">DocReview<b>AI</b></span>';
+  h+='<span class="badge">IEC \u00b7 IEEE \u00b7 ISO</span>';
+  if(s.pdfName)h+='<div class="sep"></div><span class="filename">'+esc(s.pdfName)+'</span>';
+  h+='</div><div class="topbar-right">';
+  if(s.showComments){
+    h+='<div class="stats">';
+    h+='<div class="stat"><div class="stat-dot" style="background:var(--accent)"></div><span style="color:var(--accent)">'+stats.errors+'</span></div>';
+    h+='<div class="stat"><div class="stat-dot" style="background:var(--amber)"></div><span style="color:var(--amber)">'+stats.warnings+'</span></div>';
+    h+='<div class="stat"><div class="stat-dot" style="background:var(--blue)"></div><span style="color:var(--blue)">'+stats.infos+'</span></div>';
+    h+='<span class="stat-total">'+stats.resolved+'/'+stats.total+'</span></div>';
+  }
+  if(s.pdfDoc)h+='<div class="zoom-badge"><span>'+s.zoom+'%</span></div>';
+  h+='<button class="btn-provider" style="background:'+ap.color+'10;border:1px solid '+ap.color+'30;color:'+ap.color+'" onclick="openSettings()">'+ap.icon+' '+ap.name+' \u25be</button>';
+  h+='<button class="btn" onclick="pickMainFile()">\u{1F4C4} '+(s.pdfDoc?'Other':'Upload')+'</button>';
+  h+='<input type="file" id="mainFileInput" accept=".pdf" onchange="loadMainFile(this)">';
+  if(s.pdfDoc&&!s.showComments)h+='<button class="btn-accent" '+(s.checking?'disabled':'')+' onclick="startCheck()">'+(s.checking?'Analyzing...':'\u26a1 Check')+'</button>';
+  if(s.showComments)h+='<button class="btn" onclick="resetCheck()">\u21ba Again</button>';
+  h+='</div></div>';
+
+  if(s.error)h+='<div class="error-bar"><span>'+esc(s.error)+'</span><div style="display:flex;gap:6px"><button class="btn" style="font-size:11px;padding:3px 8px" onclick="openSettings()">Settings</button><button style="background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer" onclick="clearError()">\u2715</button></div></div>';
+
+  h+='<div class="body">';
+
+  // Sidebar
+  h+='<div class="sidebar'+(s.sidebarOpen===false?' collapsed':'')+'">';
+  h+='<button class="sidebar-toggle" onclick="toggleSidebar()"><span style="font-size:13px;transition:transform .2s;display:inline-block;'+(s.sidebarOpen===false?'transform:rotate(180deg)':'')+'">&#x25C1;</span>'+(s.sidebarOpen!==false?'<span style="font-weight:600;white-space:nowrap;font-size:12px">Reference files</span>':'')+'</button>';
+  if(s.sidebarOpen!==false){
+    h+='<div class="sidebar-content"><input type="file" id="refFileInput" multiple accept=".pdf,.txt,.csv,.md,.json,.xml,.html,.doc,.docx" onchange="addRefFiles(this)">';
+    if(s.refFiles.length)h+='<div class="ref-status">\u2713 '+s.refFiles.length+' file(s) as AI context</div>';
+    s.refFiles.forEach((f,i)=>{h+='<div class="ref-file"><span style="font-size:12px">\u{1F4C4}</span><div style="flex:1;overflow:hidden"><div class="name">'+esc(f.name)+'</div><div class="size">'+(f.size/1024).toFixed(0)+' KB</div></div><button class="remove" onclick="removeRef('+i+')">\u2715</button></div>'});
+    h+='<button class="add-ref" onclick="pickRefFiles()">+ Add files</button>';
+    h+='<div class="ref-hint">PDF, TXT, CSV, MD, JSON</div></div>';
+  }
+  h+='</div>';
+
+  // Viewer
+  h+='<div class="viewer" id="viewer">';
+  if(!s.pdfDoc){
+    h+='<div class="upload-zone">';
+    if(s.loading)h+='<div style="text-align:center"><div class="spinner"></div><div style="font-size:13px;color:var(--text-sec)">Loading PDF...</div></div>';
+    else h+='<div class="upload-box" onclick="pickMainFile()"><div class="upload-icon">\u{1F4C4}</div><div class="upload-title">Upload your PDF</div><div class="upload-hint">Drag & drop or click to select</div><div class="upload-shortcut">Scroll = zoom \u2022 Drag = pan \u2022 Right-click = next page</div><div class="upload-btn">Select file</div></div>';
+    h+='</div>';
+  }else{
+    h+='<div class="viewer-scroll" id="viewerScroll" oncontextmenu="return onRightClick(event)">';
+    if(s.checking){
+      h+='<div class="check-overlay"><div class="check-inner">';
+      h+='<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px"><span style="font-size:18px">'+ap.icon+'</span><span style="font-size:14px;font-weight:700">'+(s.config.active==='gemini'?'Gemini analyzes entire PDF':'Parallel analysis')+'</span>';
+      h+='<span class="loading-dots"><span style="background:'+ap.color+'"></span><span style="background:'+ap.color+'"></span><span style="background:'+ap.color+'"></span></span></div>';
+      h+='<div class="progress-bar"><div class="progress-fill" style="width:'+Math.min(s.progress,100)+'%;background:linear-gradient(90deg,'+ap.color+','+ap.color+'aa)"></div></div>';
+      h+='<div style="font-size:12px;color:var(--text-sec);font-weight:600;margin-bottom:6px">'+esc(s.status)+'</div>';
+      h+='<div style="display:flex;align-items:center;justify-content:center;gap:12px">';
+      h+='<div style="font-size:20px;font-weight:800;color:var(--text);font-family:\'DM Mono\',monospace">'+Math.min(~~s.progress,100)+'%</div>';
+      h+='<div class="elapsed" id="elapsed">'+fmtTime(s.elapsed)+'</div></div>';
+      if(Object.keys(s.pageStatuses).length){
+        h+='<div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:12px">';
+        for(let p=1;p<=s.totalPages;p++){
+          const ps=s.pageStatuses[p];
+          const bg=!ps?'var(--surface-alt)':ps.status==='done'?'rgba(36,130,90,.08)':ps.status==='error'?'var(--accent-soft)':'rgba(46,107,198,.06)';
+          const bc=!ps?'var(--border-lt)':ps.status==='done'?'rgba(36,130,90,.25)':ps.status==='error'?'rgba(196,68,37,.25)':'rgba(46,107,198,.25)';
+          const label=!ps?p:ps.status==='analyzing'?'\u21bb':ps.status==='done'?'\u2713'+(ps.count||0):'\u2717';
+          h+='<div style="width:34px;height:26px;border-radius:4px;background:'+bg+';border:1px solid '+bc+';display:flex;align-items:center;justify-content:center;font-size:8px;font-family:\'DM Mono\',monospace;font-weight:700">'+label+'</div>';
+        }
+        h+='</div>';
+      }
+      if(s.refFiles.length)h+='<div style="font-size:9px;color:var(--green);margin-top:8px">+ '+s.refFiles.length+' ref files in context</div>';
+      h+='</div></div>';
+    }
+    h+='<div class="pdf-wrap" id="pdfWrap"><div class="pdf-container" id="pdfContainer"><canvas id="pdfCanvas"></canvas>';
+    if(s.showComments)pgC.forEach((c,i)=>{
+      const col=c.severity==='error'?'var(--accent)':c.severity==='warning'?'var(--amber)':'var(--blue)';
+      const act=s.activeComment===c.id;const sz=act?30:26;
+      h+='<div class="pin'+(act?' active':'')+'" style="left:'+c.x+'%;top:'+c.y+'%" onclick="event.stopPropagation();clickPin('+c.id+')">';
+      if(act)h+='<div class="pin-pulse" style="border:2.5px solid '+col+'"></div>';
+      h+='<div class="pin-dot" style="width:'+sz+'px;height:'+sz+'px;background:'+(act?col:'var(--surface)')+';border:2px solid '+col+';color:'+(act?'#fff':col)+';font-size:'+(act?12:11)+'px;box-shadow:'+(act?'0 0 18px '+col+'55,var(--shadow-lg)':'var(--shadow)')+'">'+(i+1)+'</div></div>';
+    });
+    h+='</div></div></div>';
+
+    // Bottom bar - Acrobat style
+    h+='<div class="bottombar">';
+    h+='<button class="pg-btn" '+(s.page<=1?'disabled':'')+' onclick="goPage(s.page-1)">\u25C0</button>';
+    h+='<button class="pg-btn" '+(s.page<=1?'disabled':'')+' onclick="goPage(state.page-1)">\u2039</button>';
+    h+='<input class="pg-input" id="pageInput" value="'+s.page+'" onkeydown="if(event.key===\'Enter\')goPage(+this.value)" onblur="goPage(+this.value)">';
+    h+='<span class="pg-total">/ '+s.totalPages+'</span>';
+    h+='<button class="pg-btn" '+(s.page>=s.totalPages?'disabled':'')+' onclick="goPage(state.page+1)">\u203A</button>';
+    h+='<button class="pg-btn" '+(s.page>=s.totalPages?'disabled':'')+' onclick="goPage(state.totalPages)">\u25B6</button>';
+    h+='<div class="sep" style="margin:0 8px"></div>';
+    // Page thumbnails
+    if(s.totalPages<=30){
+      for(let p=1;p<=s.totalPages;p++){
+        h+='<button class="pg-btn'+(s.page===p?' current':'')+'" style="font-size:9px;width:22px;height:22px" onclick="goPage('+p+')">'+p+'</button>';
+      }
+    }else{
+      h+='<span style="font-size:10px;color:var(--text-ter)">'+s.totalPages+' pages</span>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // Comments panel
+  if(s.showComments){
+    h+='<div class="comments">';
+    // Prompt section
+    h+='<div class="prompt-section"><div class="prompt-label">Prompt for review</div>';
+    h+='<textarea class="prompt-input" id="promptInput" onchange="state.customPrompt=this.value">'+esc(s.customPrompt)+'</textarea></div>';
+    h+='<div class="comments-header"><span class="title">Sheet '+s.page+'</span><span class="count">'+pgC.length+' issues</span></div>';
+    h+='<div class="comments-scroll" id="commentsScroll">';
+    if(!pgC.length)h+='<div class="comments-empty">No issues on this sheet</div>';
+    else pgC.forEach(c=>{
+      const sv={error:{color:'var(--accent)',bg:'var(--accent-soft)',icon:'\u2715',label:'Error'},warning:{color:'var(--amber)',bg:'var(--amber-soft)',icon:'!',label:'Warning'},info:{color:'var(--blue)',bg:'var(--blue-soft)',icon:'i',label:'Info'}}[c.severity];
+      const act=s.activeComment===c.id,res=c.status!=='pending';
+      const bc=res?(c.status==='accepted'?'var(--green)':'var(--text-ter)'):sv.color;
+      h+='<div class="card'+(act&&!res?' active':'')+(res?' resolved':'')+'" id="card-'+c.id+'" style="border-left:3px solid '+bc+';'+(act&&!res?'box-shadow:0 2px 16px '+sv.color+'18;border-color:'+sv.color+'44':'')+'" '+(res?'':'onclick="clickCard('+c.id+')"')+'>';
+      if(res){
+        h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:700;font-size:15px;color:'+(c.status==='accepted'?'var(--green)':'var(--text-ter)')+'">'+(c.status==='accepted'?'\u2713':'\u2717')+'</span><span style="font-size:12px;color:var(--text-sec)">'+(c.status==='accepted'?'Accepted':'Rejected')+'</span></div>';
+        h+='<div style="font-size:12px;color:var(--text-ter);margin-top:4px">'+esc(c.title)+'</div>';
+        if(c.userReply)h+='<div style="font-size:11px;color:var(--text-ter);margin-top:6px;font-style:italic;line-height:1.5">\u00ab'+esc(c.userReply)+'\u00bb</div>';
+      }else{
+        h+='<div class="card-header"><span class="card-sev" style="background:'+sv.bg+';color:'+sv.color+'">'+sv.icon+'</span><span class="card-sev-label" style="color:'+sv.color+'">'+sv.label+'</span>';
+        if(c.provider)h+='<span class="card-provider">'+PROVIDERS[c.provider].icon+' '+PROVIDERS[c.provider].name+'</span>';
+        h+='</div><div class="card-title">'+esc(c.title)+'</div><div class="card-text">'+esc(c.text)+'</div>';
+        h+='<div class="card-actions"><button class="card-btn card-btn-accept" onclick="event.stopPropagation();acceptComment('+c.id+')">\u2713 Accept</button><button class="card-btn card-btn-reject" onclick="event.stopPropagation();rejectComment('+c.id+')">\u2717 Reject</button></div>';
+      }
+      h+='</div>';
+    });
+    h+='</div>';
+    if(stats.resolved>0)h+='<div class="progress-footer"><div class="progress-footer-bar"><div class="progress-footer-fill" style="width:'+(stats.resolved/stats.total*100)+'%"></div></div><div class="progress-footer-text">'+stats.resolved+' / '+stats.total+' resolved</div></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  app.innerHTML=h;
+
+  if(s.pdfDoc){const cv=document.getElementById('pdfCanvas');if(cv)renderPdfPage(cv,s.pdfDoc,s.page,s.zoom)}
+  if(s.activeComment!=null){const el=document.getElementById('card-'+s.activeComment);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})}
+  setupPanZoom();
+}
+
+function renderSettings(){
+  const c=state.config;let h='<div class="modal-bg" onclick="closeSettings()"><div class="modal" onclick="event.stopPropagation()">';
+  h+='<div class="modal-head"><div><h2>AI Settings</h2><p>Select provider and add API keys</p></div><button class="modal-close" onclick="closeSettings()">\u2715</button></div>';
+  h+='<div class="modal-body">';
+  h+='<div class="section-label">Active provider</div><div class="prov-grid">';
+  Object.entries(PROVIDERS).forEach(([id,p])=>{
+    h+='<button class="prov-card'+(c.active===id?' selected':'')+'" style="'+(c.active===id?'border-color:'+p.color+';background:'+p.color+'12':'color:var(--text-sec)')+'" onclick="selectProvider(\''+id+'\')">';
+    h+='<div class="icon">'+p.icon+'</div><div class="name" style="color:'+(c.active===id?p.color:'var(--text-sec)')+'">'+p.name+'</div>';
+    if(p.recommended)h+='<div class="rec" style="color:'+p.color+'">recommended</div>';
+    h+='</button>';
+  });
+  h+='</div>';
+  h+='<div class="info-box" style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15)"><h4 style="color:#3B82F6">\u{1F535} Gemini - recommended</h4><p>Sends entire PDF natively in one request. No per-page rendering needed. Fast and accurate.</p></div>';
+  Object.entries(PROVIDERS).forEach(([id,p])=>{
+    h+='<div class="key-section"><div class="key-header"><div class="key-header-left"><span style="font-size:15px">'+p.icon+'</span><span style="font-size:12px;font-weight:700">'+p.name+'</span><span style="font-size:10px;color:var(--text-ter)">'+p.desc+'</span></div>';
+    h+='<button class="key-add" style="background:'+p.color+'10;border-color:'+p.color+'30;color:'+p.color+'" onclick="addKey(\''+id+'\')">+ Key</button></div>';
+    const keys=c.keys[id]||[];
+    if(!keys.length)h+='<div class="key-empty">Add an API key</div>';
+    keys.forEach((k,i)=>{
+      h+='<div class="key-row"><button class="key-toggle'+(k.active?' on':'')+'" style="'+(k.active?'border-color:'+p.color+';background:'+p.color:'border-color:var(--border)')+';color:#fff" onclick="toggleKey(\''+id+'\','+i+')">'+(k.active?'\u2713':'')+'</button>';
+      h+='<input class="key-label" value="'+esc(k.label)+'" placeholder="Label" onchange="updateKey(\''+id+'\','+i+',\'label\',this.value)">';
+      h+='<input class="key-input" type="password" value="'+esc(k.key)+'" placeholder="'+(id==='gemini'?'AIza...':id==='claude'?'sk-ant-...':'sk-...')+'" onchange="updateKey(\''+id+'\','+i+',\'key\',this.value)">';
+      h+='<button class="key-remove" onclick="removeKey(\''+id+'\','+i+')">\u2715</button></div>';
+    });
+    h+='</div>';
+  });
+  h+='</div><div class="modal-foot"><button class="btn" onclick="closeSettings()">Close</button></div></div></div>';
+  return h;
+}
+
+// ═══ PAN & ZOOM ═══
+let isDragging=false,dragStartX=0,dragStartY=0,scrollStartX=0,scrollStartY=0;
+
+function setupPanZoom(){
+  const el=document.getElementById('viewerScroll');
+  if(!el)return;
+  el.onmousedown=function(e){
+    if(e.button!==0)return; // left button only
+    if(e.target.closest('.pin'))return;
+    isDragging=true;
+    dragStartX=e.clientX;dragStartY=e.clientY;
+    scrollStartX=el.scrollLeft;scrollStartY=el.scrollTop;
+    el.classList.add('dragging');
+    e.preventDefault();
+  };
+  document.onmousemove=function(e){
+    if(!isDragging)return;
+    el.scrollLeft=scrollStartX-(e.clientX-dragStartX);
+    el.scrollTop=scrollStartY-(e.clientY-dragStartY);
+  };
+  document.onmouseup=function(){
+    if(isDragging){isDragging=false;const el=document.getElementById('viewerScroll');if(el)el.classList.remove('dragging')}
+  };
+}
+
+// Zoom to cursor position
+document.addEventListener('wheel',function(e){
+  if(!state.pdfDoc)return;
+  const viewer=document.getElementById('viewerScroll');
+  if(!viewer||!viewer.contains(e.target))return;
+  e.preventDefault();
+
+  const oldZoom=state.zoom;
+  const delta=e.deltaY>0?-8:8;
+  const newZoom=Math.max(25,Math.min(400,oldZoom+delta));
+  if(newZoom===oldZoom)return;
+
+  // Get cursor position relative to scroll container
+  const rect=viewer.getBoundingClientRect();
+  const cursorX=e.clientX-rect.left;
+  const cursorY=e.clientY-rect.top;
+
+  // Point in content before zoom
+  const contentX=(viewer.scrollLeft+cursorX);
+  const contentY=(viewer.scrollTop+cursorY);
+
+  // Scale factor
+  const scale=newZoom/oldZoom;
+
+  state.zoom=newZoom;
+
+  // Re-render
+  const cv=document.getElementById('pdfCanvas');
+  if(cv)renderPdfPage(cv,state.pdfDoc,state.page,newZoom);
+
+  // Update zoom badge
+  const badge=document.querySelector('.zoom-badge span');
+  if(badge)badge.textContent=newZoom+'%';
+
+  // Adjust scroll to keep cursor point stable
+  requestAnimationFrame(()=>{
+    viewer.scrollLeft=contentX*scale-cursorX;
+    viewer.scrollTop=contentY*scale-cursorY;
+  });
+},{passive:false});
+
+// Right-click = next page
+function onRightClick(e){
+  e.preventDefault();
+  if(state.page<state.totalPages){
+    state.page++;state.activeComment=null;render();
+  }
+  return false;
+}
+
+// ═══ ACTIONS ═══
+function pickMainFile(){document.getElementById('mainFileInput').click()}
+function pickRefFiles(){document.getElementById('refFileInput').click()}
+async function loadMainFile(input){
+  const f=input.files?.[0];if(!f)return;
+  state.loading=true;state.pdfName=f.name;render();
+  try{originalPdfFile=f;const buf=await f.arrayBuffer();const doc=await pdfjsLib.getDocument({data:buf}).promise;
+    state.pdfDoc=doc;state.totalPages=doc.numPages;state.page=1;state.zoom=100;
+    state.showComments=false;state.comments=[];state.activeComment=null;state.error=''}
+  catch(e){state.error='Cannot open PDF';console.error(e)}
+  state.loading=false;input.value='';render();
+}
+function addRefFiles(input){state.refFiles=[...state.refFiles,...Array.from(input.files||[])];input.value='';render()}
+function removeRef(i){state.refFiles=state.refFiles.filter((_,j)=>j!==i);render()}
+function toggleSidebar(){state.sidebarOpen=state.sidebarOpen===false;render()}
+function goPage(p){p=Math.max(1,Math.min(state.totalPages,~~p));if(p!==state.page){state.page=p;state.activeComment=null;render()}}
+function clickPin(id){state.activeComment=state.activeComment===id?null:id;render()}
+function clickCard(id){state.activeComment=state.activeComment===id?null:id;render()}
+function acceptComment(id){state.comments=state.comments.map(c=>c.id===id?{...c,status:'accepted'}:c);state.activeComment=null;render()}
+function rejectComment(id){
+  const reply=prompt('Why do you disagree?');
+  if(reply!==null){state.comments=state.comments.map(c=>c.id===id?{...c,status:'rejected',userReply:reply}:c);state.activeComment=null;render()}
+}
+function startCheck(){if(originalPdfFile)runCheck(originalPdfFile)}
+function resetCheck(){state.showComments=false;state.comments=[];state.activeComment=null;state.error='';render()}
+function clearError(){state.error='';render()}
+function openSettings(){state.showSettings=true;render()}
+function closeSettings(){state.showSettings=false;render()}
+function selectProvider(id){state.config.active=id;render()}
+function addKey(p){if(!state.config.keys[p])state.config.keys[p]=[];state.config.keys[p].push({label:'Key '+(state.config.keys[p].length+1),key:'',active:true});render()}
+function toggleKey(p,i){state.config.keys[p][i].active=!state.config.keys[p][i].active;render()}
+function updateKey(p,i,f,v){state.config.keys[p][i][f]=v}
+function removeKey(p,i){state.config.keys[p]=state.config.keys[p].filter((_,j)=>j!==i);render()}
+
+// Drag & drop
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',async e=>{
+  e.preventDefault();const f=e.dataTransfer.files?.[0];
+  if(f&&f.type==='application/pdf'){
+    state.loading=true;state.pdfName=f.name;render();
+    try{originalPdfFile=f;const buf=await f.arrayBuffer();const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      state.pdfDoc=doc;state.totalPages=doc.numPages;state.page=1;state.zoom=100;
+      state.showComments=false;state.comments=[];state.activeComment=null;state.error=''}
+    catch(e){state.error='Cannot open PDF'}
+    state.loading=false;render();
+  }
+});
+
+render();
+</script></body></html>
