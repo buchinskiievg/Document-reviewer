@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DocReview AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#eceae5;--sf:#fff;--sf2:#f5f3ef;--bd:#d8d4cc;--bd2:#e8e5df;--tx:#1b1b1b;--tx2:#555;--tx3:#999;
+--ac:#bf3d20;--acs:rgba(191,61,32,.06);--bl:#2563eb;--bls:rgba(37,99,235,.06);--gn:#16a34a;--gns:rgba(22,163,74,.06);
+--am:#ca8a04;--ams:rgba(202,138,4,.06);--sh:0 1px 3px rgba(0,0,0,.08);--rd:6px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+textarea,input{font-family:inherit}
+input[type=file]{display:none}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.03)}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#aaa}
+
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* Top bar */
+.top{height:42px;background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:-.5px;color:var(--tx)}.logo b{color:var(--ac)}
+.sep{width:1px;height:16px;background:var(--bd)}
+.fname{font-size:11px;color:var(--tx3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-r{margin-left:auto;display:flex;align-items:center;gap:6px}
+.btn{padding:4px 10px;border-radius:var(--rd);font-size:11px;font-weight:600;border:1px solid var(--bd);background:var(--sf);color:var(--tx2)}
+.btn:hover{border-color:#aaa}
+.btn-ac{background:var(--ac);color:#fff;border:none;font-weight:700}
+.btn-ac:disabled{opacity:.4;cursor:default}
+.zm{font-size:10px;color:var(--tx3);min-width:40px;text-align:center;padding:3px 6px;border:1px solid var(--bd);border-radius:var(--rd);background:var(--sf2)}
+
+/* Stats */
+.stats{display:flex;gap:6px;align-items:center}
+.stat{display:flex;align-items:center;gap:2px;font-size:10px;font-weight:700}
+.dot{width:5px;height:5px;border-radius:50%;display:inline-block}
+
+/* Error */
+.err{background:var(--acs);padding:4px 12px;font-size:11px;color:var(--ac);font-weight:600;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(191,61,32,.15)}
+
+.main{display:flex;flex:1;overflow:hidden}
+
+/* Left panel */
+.left{width:240px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.left.hide{width:0;border:none;overflow:hidden}
+.left-head{padding:8px 10px;border-bottom:1px solid var(--bd2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.left-body{flex:1;overflow:auto;padding:8px}
+
+/* Specialist cards */
+.spec-card{border:1px solid var(--bd);border-radius:var(--rd);padding:8px;margin-bottom:6px;background:var(--sf);transition:all .2s}
+.spec-card.active{border-color:var(--bl);background:var(--bls)}
+.spec-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.spec-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.spec-name{font-size:10px;font-weight:700;flex:1}
+.spec-toggle{width:14px;height:14px;border-radius:3px;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:800}
+.spec-toggle.on{background:var(--gn);border-color:var(--gn)}
+.spec-status{font-size:8px;color:var(--tx3);margin-top:2px}
+.spec-status.done{color:var(--gn)}
+.spec-status.running{color:var(--bl)}
+.spec-status.error{color:var(--ac)}
+.spec-prompt{width:100%;border:1px solid var(--bd2);border-radius:4px;padding:4px 6px;font-size:9px;color:var(--tx);resize:vertical;min-height:40px;outline:none;margin-top:4px;line-height:1.4;display:none}
+.spec-card.expanded .spec-prompt{display:block}
+.spec-key{width:100%;border:1px solid var(--bd2);border-radius:4px;padding:3px 6px;font-size:9px;color:var(--tx);outline:none;margin-top:3px;display:none}
+.spec-card.expanded .spec-key{display:block}
+
+.add-spec{width:100%;padding:6px;border:1px dashed var(--bd);border-radius:var(--rd);color:var(--tx3);font-size:10px;margin-top:4px;text-align:center}
+
+/* Viewer */
+.viewer{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.vscroll{flex:1;overflow:auto;background:var(--bg);cursor:grab;position:relative}
+.vscroll.dragging{cursor:grabbing}
+.pdfwrap{display:flex;justify-content:center;align-items:flex-start;min-height:100%;min-width:100%}
+.pdfbox{position:relative;box-shadow:var(--sh);border-radius:2px;background:#fff;line-height:0;flex-shrink:0;margin:12px}
+
+.upload{flex:1;display:flex;align-items:center;justify-content:center}
+.ubox{display:flex;flex-direction:column;align-items:center;padding:32px;border:2px dashed var(--bd);border-radius:12px;cursor:pointer;max-width:340px;width:100%}
+.ubox:hover{border-color:var(--ac)}
+
+.spinner{width:20px;height:20px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:spin .6s linear infinite}
+
+/* Overlay */
+.overlay{position:absolute;inset:0;background:rgba(236,234,229,.94);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-box{width:400px;text-align:center}
+.ov-spinner{width:40px;height:40px;border:3px solid var(--bd);border-radius:50%;margin:0 auto 14px;position:relative;animation:spin 1.5s linear infinite}
+.ov-spinner::after{content:'';position:absolute;top:-3px;left:50%;width:8px;height:8px;background:var(--ac);border-radius:50%;margin-left:-4px}
+
+/* Pre-check chat */
+.chat-ov{position:absolute;inset:0;background:rgba(236,234,229,.96);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:60}
+.chat-box{width:520px;max-height:80vh;background:var(--sf);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;overflow:hidden}
+.chat-head{padding:10px 14px;border-bottom:1px solid var(--bd);font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.chat-body{flex:1;overflow:auto;padding:12px}
+.chat-foot{padding:8px 12px;border-top:1px solid var(--bd);display:flex;gap:5px}
+.chat-foot input{flex:1;border:1px solid var(--bd);border-radius:var(--rd);padding:6px 10px;font-size:11px;outline:none}
+.chat-foot input:focus{border-color:var(--ac)}
+
+.ai-msg{background:var(--sf2);border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:11px;line-height:1.6;color:var(--tx2);white-space:pre-line;border-left:3px solid var(--bl)}
+.ai-btns{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.ai-btn{padding:4px 9px;border-radius:var(--rd);font-size:10px;font-weight:600;border:1px solid var(--bd);background:var(--sf);color:var(--tx2)}
+.ai-btn:hover{border-color:var(--ac);color:var(--ac)}
+.ai-btn.primary{background:var(--ac);color:#fff;border-color:var(--ac)}
+.user-msg{background:rgba(191,61,32,.04);border-radius:8px;padding:7px 11px;margin-bottom:7px;font-size:11px;line-height:1.5;text-align:right;border-right:3px solid var(--ac)}
+.ai-load{display:flex;align-items:center;gap:5px;padding:6px;font-size:10px;color:var(--tx3)}
+.ai-spin{width:12px;height:12px;border:2px solid var(--bd);border-top-color:var(--bl);border-radius:50%;animation:spin .5s linear infinite}
+
+/* Pins */
+.pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10;transition:all .15s}
+.pin.hi{z-index:100;filter:drop-shadow(0 0 8px currentColor)}
+.pin-ring{position:absolute;top:50%;left:50%;width:36px;height:36px;border-radius:50%;opacity:.5;transform:translate(-50%,-50%);animation:pp 1.4s ease-in-out infinite;border:2px solid}
+.pin-dot{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9px;transition:all .2s;box-shadow:var(--sh)}
+
+/* Bottom */
+.bbar{height:30px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:center;gap:4px;background:var(--sf);flex-shrink:0;padding:0 8px}
+.pbtn{width:22px;height:22px;border-radius:4px;border:1px solid var(--bd);background:var(--sf);color:var(--tx2);font-size:10px;display:flex;align-items:center;justify-content:center}
+.pbtn:hover{background:var(--sf2)}.pbtn:disabled{opacity:.2;cursor:default}
+.pg-sel{position:relative}
+.pg-cur{min-width:34px;height:22px;border:1px solid var(--bd);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;cursor:pointer;background:var(--sf);padding:0 4px}
+.pg-cur:hover{border-color:var(--ac)}
+.pg-drop{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:var(--sf);border:1px solid var(--bd);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow:auto;z-index:200;min-width:42px;padding:2px}
+.pg-drop button{display:block;width:100%;padding:3px 8px;border-radius:3px;font-size:10px;color:var(--tx2);text-align:center}
+.pg-drop button:hover{background:var(--sf2)}.pg-drop button.cur{background:var(--ac);color:#fff;font-weight:700}
+.pg-tot{font-size:9px;color:var(--tx3)}
+.fit-btns{display:flex;gap:2px;margin-left:6px}
+.fit-b{padding:2px 5px;border:1px solid var(--bd);border-radius:3px;font-size:8px;font-weight:600;color:var(--tx3);background:var(--sf)}
+.fit-b:hover{border-color:var(--ac);color:var(--ac)}
+
+/* Right panel */
+.right{width:340px;background:var(--sf);border-left:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.right.hide{width:0;border:none}
+.r-tabs{display:flex;border-bottom:1px solid var(--bd)}
+.r-tab{flex:1;padding:7px;text-align:center;font-size:10px;font-weight:600;color:var(--tx3);border-bottom:2px solid transparent;cursor:pointer}
+.r-tab.active{color:var(--ac);border-color:var(--ac)}
+.r-scroll{flex:1;overflow:auto;padding:6px}
+.r-empty{text-align:center;padding:20px;color:var(--tx3);font-size:10px}
+
+/* Comment card */
+.crd{border:1px solid var(--bd);border-radius:var(--rd);padding:8px;margin-bottom:4px;cursor:pointer;scroll-margin-top:4px;animation:fadeUp .25s;transition:all .2s}
+.crd:hover{border-color:#bbb}
+.crd.hi{background:var(--sf2);border-color:var(--bl);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+.crd.resolved{opacity:.4;cursor:default}
+.crd-top{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.crd-sev{width:16px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800}
+.crd-sl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.crd-spec{font-size:7px;color:var(--tx3);margin-left:auto;padding:1px 4px;border-radius:2px;border:1px solid var(--bd2);display:flex;align-items:center;gap:2px}
+.crd-spec .dot{width:5px;height:5px}
+.crd-tt{font-size:11px;font-weight:700;line-height:1.35;margin-bottom:3px}
+.crd-tx{font-size:10px;color:var(--tx2);line-height:1.55;margin-bottom:8px;white-space:pre-line;max-height:120px;overflow:auto}
+.crd-acts{display:flex;gap:3px}
+.crd-b{flex:1;padding:4px;border-radius:4px;font-size:9px;font-weight:600;text-align:center}
+.crd-ba{background:var(--gns);color:var(--gn);border:1px solid rgba(22,163,74,.15)}
+.crd-br{background:var(--acs);color:var(--ac);border:1px solid rgba(191,61,32,.15)}
+.crd-pg{font-size:7px;color:var(--tx3);margin-top:3px;text-align:right}
+
+.pfooter{padding:6px 8px;border-top:1px solid var(--bd2);background:var(--sf2)}
+.pfooter-bar{height:3px;background:var(--bd);border-radius:2px;overflow:hidden;margin-bottom:3px}
+.pfooter-fill{height:100%;background:var(--gn);border-radius:2px;transition:width .4s}
+.pfooter-tx{font-size:8px;color:var(--tx3);text-align:center}
+
+/* Log */
+.log-ta{width:100%;height:180px;background:#1a1a1a;color:#7dca7d;font-family:monospace;font-size:9px;padding:6px;border-radius:var(--rd);overflow:auto;white-space:pre-wrap;line-height:1.4;border:none;resize:vertical}
+
+/* Settings modal */
+.mbg{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18);backdrop-filter:blur(3px)}
+.mdl{width:480px;max-height:80vh;background:var(--sf);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;overflow:hidden}
+.mdl-h{padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700}
+.mdl-b{flex:1;overflow:auto;padding:12px}
+.mdl-f{padding:8px 14px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end}
+
+.tabs{display:flex;gap:2px;margin-bottom:10px;background:var(--sf2);border-radius:var(--rd);padding:2px}
+.tab{flex:1;padding:5px;border-radius:4px;text-align:center;font-size:10px;font-weight:600;color:var(--tx3)}
+.tab.active{background:var(--sf);color:var(--tx);box-shadow:var(--sh)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pp{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(1.5);opacity:0}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ═══ DEFAULT SPECIALISTS ═══
+const DEF_SPECS=[
+  {id:'elec',name:'Electrical Power Engineer',color:'#2563eb',enabled:true,key:'',
+   prompt:'Check electrical power distribution: cable sizing, voltage drop calculations, transformer ratings, busbar capacity, power factor correction. Standards: IEC 60364, IEC 61439, IEC 60909. Check every connection, every cable cross-section, every protective device rating.'},
+  {id:'relay',name:'Relay Protection Engineer',color:'#7c3aed',enabled:true,key:'',
+   prompt:'Check protection and relay coordination: overcurrent protection settings, differential protection zones, selectivity between upstream/downstream devices, CT/VT ratios, protection coordination curves. Standards: IEC 60255, IEEE C37. Verify every relay setting and coordination pair.'},
+  {id:'inst',name:'Instrumentation & Control',color:'#0891b2',enabled:true,key:'',
+   prompt:'Check instrumentation: signal types (4-20mA, HART, Profibus), cable specifications, instrument data sheets vs P&ID consistency, control valve sizing, safety instrumented systems SIL levels. Standards: IEC 61511, IEC 61131.'},
+  {id:'fire',name:'Fire Safety Engineer',color:'#dc2626',enabled:true,key:'',
+   prompt:'Check fire safety: evacuation routes widths (min 1.2m per IEC/local codes), fire resistance ratings, smoke detection coverage, sprinkler spacing, emergency lighting, fire compartmentation, maximum travel distances to exits.'},
+  {id:'hvac',name:'HVAC Engineer',color:'#059669',enabled:true,key:'',
+   prompt:'Check HVAC systems: duct sizing, air flow calculations, equipment capacities, refrigerant pipe sizing, ventilation rates per occupancy, smoke extraction systems, energy efficiency compliance.'},
+  {id:'arch',name:'Architectural Reviewer',color:'#d97706',enabled:false,key:'',
+   prompt:'Check architectural drawings: room dimensions, door/window schedules, accessibility compliance, material specifications, finish schedules, coordination with structural and MEP.'},
+];
+
+const SYS_PRE=`You are an expert engineering document reviewer.
+Look at this PDF document. Describe in Russian:
+1. What project is this?
+2. What types of drawings/sheets does it contain?
+3. What disciplines are covered?
+Be specific about what you see on each page. End with asking user to confirm.`;
+
+const SYS_CHECK=`You are a senior engineering specialist. Review this document THOROUGHLY.
+Return a JSON array of issues found. Each issue MUST have:
+{"severity":"error|warning|info","title":"Standard: Title","text":"Detailed description","x":NUMBER,"y":NUMBER,"page":NUMBER}
+
+CRITICAL RULES FOR COORDINATES:
+- x = horizontal position as percentage (0=left edge, 100=right edge)  
+- y = vertical position as percentage (0=top edge, 100=bottom edge)
+- Place each issue at the EXACT location on the drawing where you found it
+- Scatter issues across the page - do NOT cluster them
+- If issue is about a component in top-left, use x=15,y=20
+- If issue is about something in bottom-right, use x=80,y=85
+- NEVER put all issues at x=50,y=50
+
+Return ONLY valid JSON array. Russian language. No markdown fences.
+If no issues found, return [].
+
+YOUR SPECIALIZATION AND INSTRUCTIONS:
+`;
+
+let S={pdfDoc:null,pdfName:'',totalPages:0,page:1,zoom:100,
+  specs:JSON.parse(JSON.stringify(DEF_SPECS)),
+  comments:[],showComments:false,activeComment:null,
+  checking:false,specStatuses:{},elapsed:0,eTimer:null,error:'',
+  showSettings:false,settingsTab:'specs',showPageDrop:false,
+  precheck:false,pcMsgs:[],pcLoading:false,
+  rightTab:'comments', // comments | log
+  logs:[],globalKey:''};
+let origFile=null,rTask=null;
+
+function log(m,t){const ts=new Date().toLocaleTimeString();const e='['+ts+'] '+(t?t.toUpperCase()+': ':'')+m;S.logs.push(e);if(S.logs.length>300)S.logs=S.logs.slice(-200);console.log(e);const el=document.getElementById('logTA');if(el){el.value=S.logs.join('\n');el.scrollTop=el.scrollHeight}}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function ft(s){const m=~~(s/60),sc=s%60;return(m?m+'m ':'')+(sc<10&&m?'0':'')+sc+'s'}
+
+async function f2b(f){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(f)})}
+
+function spj(text){
+  log('Response length: '+text.length);
+  let s=text.replace(/`{1,3}json\s*/gi,'').replace(/`{1,3}\s*$/gm,'').trim();
+  const f=s.indexOf('[');let l=s.lastIndexOf(']');
+  if(f<0){log('No [ found','error');return[]}
+  if(l<=f){log('No ] - truncated, salvaging','warn');s=s.slice(f);const lb=s.lastIndexOf('}');if(lb>0){s=s.slice(0,lb+1)+']';log('Salvaged')}else return[]}
+  else s=s.slice(f,l+1);
+  // Fix control chars in strings
+  let out='',inS=false,es=false;
+  for(let i=0;i<s.length;i++){const c=s[i],cd=s.charCodeAt(i);if(es){out+=c;es=false;continue}if(c==='\\'&&inS){es=true;out+=c;continue}if(c==='"'){inS=!inS;out+=c;continue}if(inS&&cd<32){if(c==='\n')out+='\\n';else if(c==='\r')out+='\\r';else if(c==='\t')out+='\\t';continue}out+=c}
+  try{const r=JSON.parse(out);log('Parsed: '+r.length+' items');return r}catch(e){log('Parse fail: '+e.message,'warn')}
+  try{const fn=new Function('return '+out);const r=fn();if(Array.isArray(r)){log('Eval OK: '+r.length);return r}}catch(e2){}
+  log('ALL PARSE FAILED','error');return[];
+}
+
+// ═══ GEMINI API ═══
+async function gemini(file,sysPrompt,key,isChat){
+  const b=await f2b(file);
+  log('Gemini call: b64='+b.length+', chat='+isChat);
+  const url='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+key;
+  const body={systemInstruction:{parts:[{text:sysPrompt}]},
+    contents:[{parts:[{inlineData:{mimeType:'application/pdf',data:b}},
+      {text:isChat?'Describe this document.':'Find ALL technical issues. Include page numbers and accurate x,y coordinates for each.'}]}],
+    generationConfig:{maxOutputTokens:65000,temperature:isChat?0.3:0.1}};
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  log('Gemini status: '+r.status);
+  if(!r.ok){const e=await r.text();log('Gemini error: '+e.slice(0,300),'error');throw new Error('Gemini '+r.status)}
+  const d=await r.json();
+  const fr=d.candidates?.[0]?.finishReason||'';if(fr)log('finishReason: '+fr);
+  if(fr==='MAX_TOKENS')log('Response truncated!','warn');
+  return d.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+}
+
+// ═══ PRE-CHECK ═══
+async function startPrecheck(){
+  const key=S.globalKey||S.specs.find(s=>s.key)?.key;
+  if(!key){S.error='Add Gemini API key in settings or on any specialist';render();return}
+  S.precheck=true;S.pcMsgs=[];S.pcLoading=true;render();
+  try{
+    log('=== PRECHECK ===');
+    const txt=await gemini(origFile,SYS_PRE,key,true);
+    S.pcMsgs.push({role:'ai',text:txt.replace('CONFIRMED','').trim()});
+    S.pcLoading=false;
+  }catch(e){S.error=e.message;S.precheck=false;S.pcLoading=false}
+  render();
+}
+
+async function pcSend(msg){
+  if(!msg.trim())return;
+  const key=S.globalKey||S.specs.find(s=>s.key)?.key;if(!key)return;
+  S.pcMsgs.push({role:'user',text:msg});S.pcLoading=true;render();
+  try{
+    const conv=S.pcMsgs.map(m=>(m.role==='ai'?'AI: ':'User: ')+m.text).join('\n\n');
+    const sp=SYS_PRE+'\n\nConversation:\n'+conv+'\n\nRespond to user. If confirmed, say CONFIRMED.';
+    const txt=await gemini(origFile,sp,key,true);
+    S.pcMsgs.push({role:'ai',text:txt.replace('CONFIRMED','').trim()});
+    S.pcLoading=false;
+  }catch(e){S.pcLoading=false;S.error=e.message}
+  render();
+}
+
+function confirmPC(){
+  S.precheck=false;
+  const ctx=S.pcMsgs.filter(m=>m.role==='ai').map(m=>m.text).join('\n');
+  runParallelCheck(origFile,ctx);
+}
+
+// ═══ PARALLEL CHECK - ALL SPECIALISTS AT ONCE ═══
+async function runParallelCheck(file,context){
+  const activeSpecs=S.specs.filter(s=>s.enabled);
+  if(!activeSpecs.length){S.error='Enable at least one specialist';render();return}
+  
+  // Each spec needs a key - either its own or global
+  for(const sp of activeSpecs){
+    const k=sp.key||S.globalKey;
+    if(!k){S.error='Specialist "'+sp.name+'" has no API key. Add key or set global key in settings.';render();return}
+  }
+
+  log('=== PARALLEL CHECK: '+activeSpecs.length+' specialists ===');
+  S.checking=true;S.error='';S.specStatuses={};S.comments=[];S.showComments=false;S.activeComment=null;S.elapsed=0;
+  if(S.eTimer)clearInterval(S.eTimer);
+  S.eTimer=setInterval(()=>{S.elapsed++;const el=document.getElementById('elapsed');if(el)el.textContent=ft(S.elapsed)},1000);
+  render();
+
+  // Launch ALL specialists in parallel
+  const promises=activeSpecs.map(spec=>{
+    S.specStatuses[spec.id]={status:'running',count:0};render();
+    const key=spec.key||S.globalKey;
+    const sysP=SYS_CHECK+spec.prompt+(context?'\n\nDocument context:\n'+context:'');
+    log('['+spec.name+'] Starting...');
+    
+    return gemini(file,sysP,key,false).then(txt=>{
+      log('['+spec.name+'] Response received');
+      const issues=spj(txt);
+      log('['+spec.name+'] Found '+issues.length+' issues');
+      S.specStatuses[spec.id]={status:'done',count:issues.length};
+      render();
+      return issues.map(r=>({
+        spec:spec.id,specName:spec.name,specColor:spec.color,
+        page:Math.max(1,Math.min(S.totalPages,parseInt(r.page)||1)),
+        x:Math.max(5,Math.min(95,Number(r.x)||50)),
+        y:Math.max(5,Math.min(95,Number(r.y)||50)),
+        severity:['error','warning','info'].includes(r.severity)?r.severity:'info',
+        title:r.title||'Issue',text:r.text||'',
+        status:'pending',userReply:''
+      }));
+    }).catch(e=>{
+      log('['+spec.name+'] FAILED: '+e.message,'error');
+      S.specStatuses[spec.id]={status:'error',error:e.message};
+      render();
+      return[];
+    });
+  });
+
+  const results=await Promise.all(promises);
+  
+  // Merge all results
+  let id=1;
+  const all=[];
+  for(const arr of results)for(const item of arr)all.push({...item,id:id++});
+  
+  S.comments=all;S.showComments=true;
+  log('=== DONE: '+all.length+' total issues from '+activeSpecs.length+' specialists ===');
+  clearInterval(S.eTimer);S.eTimer=null;S.checking=false;render();
+}
+
+// ═══ PDF ═══
+function rpdf(cv,doc,num,zm){if(!doc||!cv)return;if(rTask)try{rTask.cancel()}catch(e){}
+  doc.getPage(num).then(pg=>{const s=(zm/100)*2,vp=pg.getViewport({scale:s});
+  cv.width=vp.width;cv.height=vp.height;cv.style.width=(vp.width/2)+'px';cv.style.height=(vp.height/2)+'px';
+  rTask=pg.render({canvasContext:cv.getContext('2d'),viewport:vp})})}
+
+async function fitM(mode){
+  if(!S.pdfDoc)return;const vs=document.getElementById('vs');if(!vs)return;
+  const pg=await S.pdfDoc.getPage(S.page);const vp=pg.getViewport({scale:1});
+  const pw=vp.width/2,ph=vp.height/2,cw=vs.clientWidth-30,ch=vs.clientHeight-30;
+  if(mode==='w')S.zoom=~~(cw/pw*100);else if(mode==='h')S.zoom=~~(ch/ph*100);else S.zoom=100;
+  S.zoom=Math.max(25,Math.min(400,S.zoom));render()}
+
+// ═══ RENDER ═══
+function render(){
+  const s=S,app=document.getElementById('app');
+  const pc=s.comments.filter(c=>c.page===s.page);
+  const st={t:s.comments.length,e:s.comments.filter(c=>c.severity==='error').length,
+    w:s.comments.filter(c=>c.severity==='warning').length,i:s.comments.filter(c=>c.severity==='info').length,
+    r:s.comments.filter(c=>c.status!=='pending').length};
+  let h='';
+
+  if(s.showSettings)h+=rndSet();
+
+  // Top
+  h+='<div class="top"><span class="logo">DocReview<b>AI</b></span>';
+  if(s.pdfName)h+='<div class="sep"></div><span class="fname">'+esc(s.pdfName)+'</span>';
+  h+='<div class="top-r">';
+  if(s.showComments){
+    h+='<div class="stats">';
+    h+='<span class="stat" style="color:var(--ac)"><span class="dot" style="background:var(--ac)"></span>'+st.e+'</span>';
+    h+='<span class="stat" style="color:var(--am)"><span class="dot" style="background:var(--am)"></span>'+st.w+'</span>';
+    h+='<span class="stat" style="color:var(--bl)"><span class="dot" style="background:var(--bl)"></span>'+st.i+'</span>';
+    h+='<span style="font-size:9px;color:var(--tx3)">'+st.r+'/'+st.t+'</span></div>';
+  }
+  if(s.pdfDoc)h+='<span class="zm">'+s.zoom+'%</span>';
+  h+='<button class="btn" onclick="openSet()">Settings</button>';
+  h+='<button class="btn" onclick="pickF()">'+( s.pdfDoc?'Other PDF':'Load PDF')+'</button>';
+  h+='<input type="file" id="fi" accept=".pdf" onchange="loadF(this)">';
+  if(s.pdfDoc&&!s.showComments&&!s.checking&&!s.precheck)h+='<button class="btn btn-ac" onclick="startPrecheck()">Check</button>';
+  if(s.showComments)h+='<button class="btn" onclick="resetC()">Reset</button>';
+  h+='</div></div>';
+
+  if(s.error)h+='<div class="err"><span>'+esc(s.error)+'</span><button style="color:var(--ac);font-size:12px" onclick="S.error=\'\';render()">x</button></div>';
+
+  h+='<div class="main">';
+
+  // Left panel - specialists
+  h+='<div class="left" id="leftP">';
+  h+='<div class="left-head">AI Specialists<button class="btn" style="font-size:9px;padding:2px 6px" onclick="addSpec()">+ Add</button></div>';
+  h+='<div class="left-body">';
+  s.specs.forEach((sp,i)=>{
+    const ss=s.specStatuses[sp.id];
+    const expanded=sp._expanded;
+    h+='<div class="spec-card'+(expanded?' expanded':'')+(sp.enabled?' active':'')+'" style="border-left:3px solid '+sp.color+'">';
+    h+='<div class="spec-head">';
+    h+='<div class="spec-color" style="background:'+sp.color+'"></div>';
+    h+='<span class="spec-name" onclick="S.specs['+i+']._expanded=!S.specs['+i+']._expanded;render()">'+esc(sp.name)+'</span>';
+    h+='<button class="spec-toggle'+(sp.enabled?' on':'')+'" onclick="S.specs['+i+'].enabled=!S.specs['+i+'].enabled;render()">'+(sp.enabled?'\u2713':'')+'</button>';
+    h+='</div>';
+    if(ss){
+      const cls=ss.status==='done'?'done':ss.status==='running'?'running':'error';
+      const txt=ss.status==='done'?ss.count+' issues':ss.status==='running'?'Analyzing...':'Error';
+      h+='<div class="spec-status '+cls+'">'+txt+'</div>';
+    }
+    h+='<textarea class="spec-prompt" onchange="S.specs['+i+'].prompt=this.value">'+esc(sp.prompt)+'</textarea>';
+    h+='<input class="spec-key" type="password" placeholder="API key (or use global)" value="'+esc(sp.key)+'" onchange="S.specs['+i+'].key=this.value">';
+    h+='</div>';
+  });
+  h+='</div></div>';
+
+  // Viewer
+  h+='<div class="viewer">';
+  if(!s.pdfDoc){
+    h+='<div class="upload">';
+    if(s.loading)h+='<div style="text-align:center"><div class="spinner"></div><div style="font-size:11px;color:var(--tx2)">Loading...</div></div>';
+    else h+='<div class="ubox" onclick="pickF()"><div style="font-size:28px;opacity:.3;margin-bottom:6px">\u{1F4C4}</div><div style="font-size:13px;font-weight:700;margin-bottom:3px">Upload PDF</div><div style="font-size:10px;color:var(--tx3)">Drag & drop or click</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">Scroll=zoom | Drag=pan | RClick=next page</div></div>';
+    h+='</div>';
+  }else{
+    h+='<div class="vscroll" id="vs" oncontextmenu="return rcl(event)">';
+    
+    // Pre-check chat
+    if(s.precheck){
+      h+='<div class="chat-ov"><div class="chat-box">';
+      h+='<div class="chat-head">\u{1F535} Document Analysis</div>';
+      h+='<div class="chat-body" id="chatBody">';
+      s.pcMsgs.forEach(m=>{h+='<div class="'+(m.role==='ai'?'ai-msg':'user-msg')+'">'+esc(m.text)+'</div>'});
+      if(s.pcLoading)h+='<div class="ai-load"><div class="ai-spin"></div>Analyzing document...</div>';
+      if(s.pcMsgs.length&&!s.pcLoading){
+        h+='<div class="ai-btns">';
+        h+='<button class="ai-btn primary" onclick="confirmPC()">Confirm & Start Review</button>';
+        h+='<button class="ai-btn" onclick="pcSend(\'Focus only on electrical systems\')">Only Electrical</button>';
+        h+='<button class="ai-btn" onclick="pcSend(\'Check fire safety thoroughly\')">Fire Safety</button>';
+        h+='<button class="ai-btn" onclick="pcSend(\'Be more detailed\')">More Detail</button>';
+        h+='</div>';
+      }
+      h+='</div>';
+      h+='<div class="chat-foot"><input id="pcIn" placeholder="Your instructions..." onkeydown="if(event.key===\'Enter\')pcSendInput()"><button class="btn btn-ac" onclick="pcSendInput()">Send</button><button class="btn" onclick="S.precheck=false;render()">Cancel</button></div>';
+      h+='</div></div>';
+    }
+
+    // Check overlay
+    if(s.checking){
+      h+='<div class="overlay"><div class="ov-box">';
+      h+='<div class="ov-spinner"></div>';
+      h+='<div style="font-size:13px;font-weight:700;margin-bottom:8px">Parallel Analysis</div>';
+      h+='<div style="font-size:11px;color:var(--tx2);margin-bottom:10px">'+S.specs.filter(sp=>sp.enabled).length+' specialists working simultaneously</div>';
+      // Specialist status list
+      S.specs.filter(sp=>sp.enabled).forEach(sp=>{
+        const ss=s.specStatuses[sp.id]||{};
+        const icon=ss.status==='done'?'\u2713':ss.status==='error'?'\u2717':'\u21bb';
+        const color=ss.status==='done'?'var(--gn)':ss.status==='error'?'var(--ac)':'var(--bl)';
+        h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px">';
+        h+='<div style="width:8px;height:8px;border-radius:50%;background:'+sp.color+'"></div>';
+        h+='<span style="flex:1;color:var(--tx2)">'+esc(sp.name)+'</span>';
+        h+='<span style="color:'+color+';font-weight:700">'+icon+(ss.count!=null?' '+ss.count:'')+'</span>';
+        h+='</div>';
+      });
+      h+='<div id="elapsed" style="font-size:10px;color:var(--tx3);margin-top:10px">'+ft(s.elapsed)+'</div>';
+      h+='</div></div>';
+    }
+
+    h+='<div class="pdfwrap"><div class="pdfbox"><canvas id="cv"></canvas>';
+    if(s.showComments)pc.forEach((c,i)=>{
+      const a=s.activeComment===c.id;const sz=a?26:20;
+      h+='<div class="pin'+(a?' hi':'')+'" style="left:'+c.x+'%;top:'+c.y+'%;color:'+c.specColor+'" onclick="event.stopPropagation();cpn('+c.id+')">';
+      if(a)h+='<div class="pin-ring" style="border-color:'+c.specColor+'"></div>';
+      h+='<div class="pin-dot" style="width:'+sz+'px;height:'+sz+'px;background:'+(a?c.specColor:'#fff')+';border:2px solid '+c.specColor+';color:'+(a?'#fff':c.specColor)+';font-size:'+(a?10:8)+'px">'+(i+1)+'</div></div>';
+    });
+    h+='</div></div></div>';
+
+    // Bottom bar
+    h+='<div class="bbar">';
+    h+='<button class="pbtn" '+(s.page<=1?'disabled':'')+' onclick="gp(1)">\u23EE</button>';
+    h+='<button class="pbtn" '+(s.page<=1?'disabled':'')+' onclick="gp(S.page-1)">\u2039</button>';
+    h+='<div class="pg-sel"><div class="pg-cur" onclick="S.showPageDrop=!S.showPageDrop;render()">'+s.page+'</div>';
+    if(s.showPageDrop){h+='<div class="pg-drop">';for(let p=1;p<=s.totalPages;p++)h+='<button class="'+(p===s.page?'cur':'')+'" onclick="S.showPageDrop=false;gp('+p+')">'+p+'</button>';h+='</div>'}
+    h+='</div><span class="pg-tot">/ '+s.totalPages+'</span>';
+    h+='<button class="pbtn" '+(s.page>=s.totalPages?'disabled':'')+' onclick="gp(S.page+1)">\u203A</button>';
+    h+='<button class="pbtn" '+(s.page>=s.totalPages?'disabled':'')+' onclick="gp(S.totalPages)">\u23ED</button>';
+    h+='<div class="fit-btns"><button class="fit-b" onclick="fitM(\'w\')">W</button><button class="fit-b" onclick="fitM(\'h\')">H</button><button class="fit-b" onclick="fitM(\'1\')">1:1</button></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // Right panel
+  if(s.showComments){
+    h+='<div class="right">';
+    h+='<div class="r-tabs"><div class="r-tab'+(s.rightTab==='comments'?' active':'')+'" onclick="S.rightTab=\'comments\';render()">Comments ('+st.t+')</div><div class="r-tab'+(s.rightTab==='log'?' active':'')+'" onclick="S.rightTab=\'log\';render()">Log</div></div>';
+    
+    if(s.rightTab==='comments'){
+      h+='<div class="r-scroll" id="rScroll">';
+      if(!pc.length)h+='<div class="r-empty">No issues on this page</div>';
+      else pc.forEach(c=>{
+        const sv={error:{c:'var(--ac)',b:'var(--acs)',i:'!',l:'Error'},warning:{c:'var(--am)',b:'var(--ams)',i:'\u26A0',l:'Warn'},info:{c:'var(--bl)',b:'var(--bls)',i:'i',l:'Info'}}[c.severity];
+        const a=s.activeComment===c.id,rs=c.status!=='pending';
+        h+='<div class="crd'+(a?' hi':'')+(rs?' resolved':'')+'" id="cd-'+c.id+'" style="border-left:3px solid '+(rs?'var(--tx3)':c.specColor)+'" '+(rs?'':'onclick="ccd('+c.id+')"')+'>';
+        if(rs){
+          h+='<div style="font-size:10px;color:var(--tx3)">'+(c.status==='accepted'?'\u2713 Accepted':'\u2717 Rejected')+'</div>';
+          h+='<div style="font-size:9px;color:var(--tx3);margin-top:2px">'+esc(c.title)+'</div>';
+        }else{
+          h+='<div class="crd-top"><span class="crd-sev" style="background:'+sv.b+';color:'+sv.c+'">'+sv.i+'</span><span class="crd-sl" style="color:'+sv.c+'">'+sv.l+'</span>';
+          h+='<span class="crd-spec"><span class="dot" style="background:'+c.specColor+'"></span>'+esc(c.specName)+'</span></div>';
+          h+='<div class="crd-tt">'+esc(c.title)+'</div>';
+          h+='<div class="crd-tx">'+esc(c.text)+'</div>';
+          h+='<div class="crd-acts"><button class="crd-b crd-ba" onclick="event.stopPropagation();acc('+c.id+')">\u2713 OK</button><button class="crd-b crd-br" onclick="event.stopPropagation();rej('+c.id+')">\u2717 No</button></div>';
+          h+='<div class="crd-pg">Page '+c.page+' | '+c.specName+'</div>';
+        }
+        h+='</div>';
+      });
+      h+='</div>';
+      if(st.r>0)h+='<div class="pfooter"><div class="pfooter-bar"><div class="pfooter-fill" style="width:'+(st.r/st.t*100)+'%"></div></div><div class="pfooter-tx">'+st.r+'/'+st.t+'</div></div>';
+    }else{
+      h+='<div style="padding:8px"><textarea class="log-ta" id="logTA" readonly>'+esc(S.logs.join('\n'))+'</textarea><button class="btn" style="margin-top:4px;font-size:9px" onclick="S.logs=[];render()">Clear</button></div>';
+    }
+    h+='</div>';
+  }
+
+  h+='</div>';
+  app.innerHTML=h;
+  if(s.pdfDoc){const cv=document.getElementById('cv');if(cv)rpdf(cv,s.pdfDoc,s.page,s.zoom)}
+  if(s.activeComment!=null){const el=document.getElementById('cd-'+s.activeComment);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})}
+  if(s.precheck){const cb=document.getElementById('chatBody');if(cb)cb.scrollTop=cb.scrollHeight}
+  setupPan();
+}
+
+function rndSet(){
+  let h='<div class="mbg" onclick="closeSet()"><div class="mdl" onclick="event.stopPropagation()">';
+  h+='<div class="mdl-h"><span>Settings</span><button style="font-size:14px;color:var(--tx3)" onclick="closeSet()">x</button></div>';
+  h+='<div class="mdl-b">';
+  h+='<div style="margin-bottom:12px"><label style="font-size:10px;font-weight:700;color:var(--tx2);display:block;margin-bottom:4px">Global Gemini API Key</label>';
+  h+='<input style="width:100%;border:1px solid var(--bd);border-radius:var(--rd);padding:5px 8px;font-size:10px;outline:none" type="password" value="'+esc(S.globalKey)+'" placeholder="AIza... (used for all specialists without own key)" onchange="S.globalKey=this.value"></div>';
+  h+='<div style="font-size:9px;color:var(--tx3);line-height:1.4;padding:8px;background:var(--sf2);border-radius:var(--rd)">Each specialist can have its own API key for parallel execution. If no key is set, the global key is used. Using separate keys allows true parallel processing without rate limiting.</div>';
+  h+='</div>';
+  h+='<div class="mdl-f"><button class="btn" onclick="closeSet()">Close</button></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// ═══ PAN/ZOOM ═══
+let isDrag=false,dsx=0,dsy=0,ssx=0,ssy=0;
+function setupPan(){const el=document.getElementById('vs');if(!el)return;
+  el.onmousedown=function(e){if(e.button!==0||e.target.closest('.pin,.chat-ov,.overlay'))return;
+  isDrag=true;dsx=e.clientX;dsy=e.clientY;ssx=el.scrollLeft;ssy=el.scrollTop;el.classList.add('dragging');e.preventDefault()}}
+document.addEventListener('mousemove',function(e){if(!isDrag)return;const el=document.getElementById('vs');if(el){el.scrollLeft=ssx-(e.clientX-dsx);el.scrollTop=ssy-(e.clientY-dsy)}});
+document.addEventListener('mouseup',function(){if(isDrag){isDrag=false;const el=document.getElementById('vs');if(el)el.classList.remove('dragging')}});
+
+document.addEventListener('wheel',function(e){if(!S.pdfDoc)return;const v=document.getElementById('vs');if(!v||!v.contains(e.target))return;e.preventDefault();
+  const old=S.zoom,nz=Math.max(25,Math.min(400,old+(e.deltaY>0?-8:8)));if(nz===old)return;
+  const r=v.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top,px=v.scrollLeft+cx,py=v.scrollTop+cy,sc=nz/old;
+  S.zoom=nz;const cv=document.getElementById('cv');if(cv)rpdf(cv,S.pdfDoc,S.page,nz);
+  const zm=document.querySelector('.zm');if(zm)zm.textContent=nz+'%';
+  requestAnimationFrame(()=>{v.scrollLeft=px*sc-cx;v.scrollTop=py*sc-cy})
+},{passive:false});
+
+function rcl(e){e.preventDefault();if(S.page<S.totalPages){S.page++;S.activeComment=null;S.showPageDrop=false;render()}return false}
+
+// ═══ ACTIONS ═══
+function pickF(){document.getElementById('fi').click()}
+async function loadF(inp){const f=inp.files?.[0];if(!f)return;S.loading=true;S.pdfName=f.name;render();
+  try{origFile=f;const b=await f.arrayBuffer();const d=await pdfjsLib.getDocument({data:b}).promise;
+  S.pdfDoc=d;S.totalPages=d.numPages;S.page=1;S.zoom=100;S.showComments=false;S.comments=[];S.activeComment=null;S.error='';S.precheck=false;S.pcMsgs=[];S.specStatuses={};
+  log('PDF: '+f.name+', '+d.numPages+' pages')}catch(e){S.error='Cannot open';log('PDF err: '+e.message,'error')}
+  S.loading=false;inp.value='';render()}
+function gp(p){p=Math.max(1,Math.min(S.totalPages,~~p));if(p!==S.page){S.page=p;S.activeComment=null;S.showPageDrop=false;render()}}
+function cpn(id){S.activeComment=S.activeComment===id?null:id;render()}
+function ccd(id){S.activeComment=S.activeComment===id?null:id;render()}
+function acc(id){S.comments=S.comments.map(c=>c.id===id?{...c,status:'accepted'}:c);S.activeComment=null;render()}
+function rej(id){const r=prompt('Why do you disagree?');if(r!==null){S.comments=S.comments.map(c=>c.id===id?{...c,status:'rejected',userReply:r}:c);S.activeComment=null;render()}}
+function resetC(){S.showComments=false;S.comments=[];S.activeComment=null;S.error='';S.specStatuses={};render()}
+function openSet(){S.showSettings=true;render()}
+function closeSet(){S.showSettings=false;render()}
+function pcSendInput(){const inp=document.getElementById('pcIn');if(inp&&inp.value.trim())pcSend(inp.value.trim())}
+function addSpec(){
+  const colors=['#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+  S.specs.push({id:'spec'+Date.now(),name:'New Specialist',color:colors[S.specs.length%colors.length],enabled:false,key:'',prompt:'Describe what this specialist should check...',_expanded:true});
+  render();
+}
+
+document.addEventListener('click',function(e){if(S.showPageDrop&&!e.target.closest('.pg-sel')){S.showPageDrop=false;render()}});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',async e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];
+  if(f&&f.type==='application/pdf'){S.loading=true;S.pdfName=f.name;render();
+  try{origFile=f;const b=await f.arrayBuffer();const d=await pdfjsLib.getDocument({data:b}).promise;
+  S.pdfDoc=d;S.totalPages=d.numPages;S.page=1;S.zoom=100;S.showComments=false;S.comments=[];S.activeComment=null;S.error='';
+  log('Drop: '+f.name)}catch(e){S.error='Cannot open'}S.loading=false;render()}});
+
+render();
+</script>
+</body>
+</html>
