@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolarFlow — PV Plant Layout Generator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg-body: #f4f5f7;
+    --bg-panel: #ffffff;
+    --bg-card: #f8f9fb;
+    --bg-card-hover: #f0f2f6;
+    --bg-card-active: #fff8eb;
+    --border: #e2e5eb;
+    --border-active: #e8920d;
+    --text-primary: #1a1d26;
+    --text-secondary: #5a6070;
+    --text-muted: #8b90a0;
+    --accent: #e8920d;
+    --accent-light: #fdf3e0;
+    --accent-glow: rgba(232,146,13,0.18);
+    --solar-green: #1a9e5c;
+    --solar-green-bg: #e8f8ef;
+    --cable-dc: #d63a3a;
+    --cable-ac: #2563eb;
+    --inverter: #7c3aed;
+    --transformer: #e8640d;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    height: 54px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    flex-shrink: 0;
+    z-index: 1000;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 18px; letter-spacing: -0.3px;
+  }
+
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #f7b731, #e8920d);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    box-shadow: 0 2px 8px rgba(232,146,13,0.3);
+  }
+
+  .topbar-divider { width: 1px; height: 26px; background: var(--border); }
+
+  .topbar-status {
+    font-size: 13px; color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* LEFT PANEL */
+  .panel-left {
+    width: 340px; background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .panel-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+
+  .panel-section-title {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 7px;
+  }
+
+  .panel-section-title .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+  }
+
+  .equip-grid { display: flex; flex-direction: column; gap: 6px; }
+
+  .equip-card {
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 10px 12px;
+    cursor: pointer; transition: all 0.2s ease;
+  }
+
+  .equip-card:hover { background: var(--bg-card-hover); border-color: #ccd0d8; }
+
+  .equip-card.active {
+    border-color: var(--border-active); background: var(--bg-card-active);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .equip-card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;
+  }
+
+  .equip-card-name { font-size: 13px; font-weight: 600; }
+
+  .equip-card-badge {
+    font-size: 10px; font-family: 'IBM Plex Mono', monospace; font-weight: 500;
+    padding: 2px 7px; border-radius: 5px;
+    background: var(--accent-light); color: var(--accent);
+  }
+
+  .equip-card-specs {
+    font-size: 11px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .param-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+  }
+
+  .param-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+  .param-input {
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    border-radius: 7px; color: var(--text-primary);
+    padding: 6px 10px; font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace; width: 110px; outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .param-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 600; font-family: 'Outfit', sans-serif;
+    border: none; cursor: pointer; transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #f7b731, #e8920d);
+    color: #fff; width: 100%;
+    box-shadow: 0 2px 10px rgba(232,146,13,0.25);
+  }
+
+  .btn-primary:hover { box-shadow: 0 4px 20px rgba(232,146,13,0.35); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; transform: none; }
+
+  .btn-secondary {
+    background: var(--bg-card); color: var(--text-secondary);
+    border: 1.5px solid var(--border); width: 100%;
+  }
+
+  .btn-secondary:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+  .btn-sm { padding: 6px 14px; font-size: 12px; border-radius: 7px; }
+
+  /* MAP */
+  .map-container { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  .leaflet-bar { border: none !important; box-shadow: var(--shadow-md) !important; border-radius: 8px !important; overflow: hidden; }
+  .leaflet-bar a {
+    background: rgba(255,255,255,0.92) !important; color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border) !important; backdrop-filter: blur(8px);
+    width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 16px !important;
+  }
+  .leaflet-bar a:last-child { border-bottom: none !important; }
+  .leaflet-bar a:hover { background: #fff !important; }
+  .leaflet-draw-toolbar a { background: rgba(255,255,255,0.92) !important; backdrop-filter: blur(8px); }
+  .leaflet-draw-toolbar a:hover { background: #fff !important; }
+
+  .map-hint {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.93); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 20px;
+    font-size: 13px; color: var(--text-secondary);
+    z-index: 999; pointer-events: none;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow-md); backdrop-filter: blur(12px);
+    animation: fadeInHint 0.5s ease;
+  }
+
+  @keyframes fadeInHint {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .map-hint .kbd {
+    background: var(--bg-body); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 7px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500;
+  }
+
+  /* RIGHT PANEL */
+  .panel-right {
+    width: 270px; background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column;
+  }
+
+  .stat-card { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+
+  .stat-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1px; font-weight: 500; margin-bottom: 3px;
+  }
+
+  .stat-value {
+    font-size: 21px; font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace; color: var(--text-primary);
+  }
+
+  .stat-value .unit { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-left: 3px; }
+  .stat-sub { font-size: 10px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+
+  .legend { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 5px; font-size: 12px; color: var(--text-secondary);
+  }
+
+  .legend-swatch { width: 18px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+  .legend-swatch.panels { background: var(--accent); }
+  .legend-swatch.inverter { background: var(--inverter); }
+  .legend-swatch.transformer { background: var(--transformer); }
+  .legend-swatch.dc-cable { background: none; height: 0; border-top: 2px dashed var(--cable-dc); width: 18px; }
+  .legend-swatch.ac-cable { background: var(--cable-ac); }
+
+  .steps { display: flex; flex-direction: column; gap: 8px; }
+
+  .step { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    color: var(--text-muted); flex-shrink: 0;
+  }
+
+  .step.done .step-num { background: var(--solar-green-bg); border-color: var(--solar-green); color: var(--solar-green); }
+  .step.active .step-num { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+  .step-text { color: var(--text-muted); }
+  .step.done .step-text { color: var(--text-secondary); }
+  .step.active .step-text { color: var(--text-primary); font-weight: 600; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--solar-green); color: #fff;
+    padding: 12px 24px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 600; z-index: 9999;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(26,158,92,0.3);
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .generating-overlay {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 998; backdrop-filter: blur(6px);
+  }
+
+  .generating-overlay.active { display: flex; }
+
+  .spinner-box { text-align: center; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .spinner-text { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">☀</div>SolarFlow</div>
+  <div class="topbar-divider"></div>
+  <div class="topbar-status" id="statusText">Новый проект</div>
+  <div class="topbar-actions">
+    <button class="btn btn-sm btn-secondary" onclick="resetProject()">Сброс</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel-left">
+    <div class="panel-section">
+      <div class="panel-section-title"><span class="dot"></span>Этапы проектирования</div>
+      <div class="steps">
+        <div class="step active" id="step1"><div class="step-num">1</div><div class="step-text">Нарисуйте участок на карте</div></div>
+        <div class="step" id="step2"><div class="step-num">2</div><div class="step-text">Выберите оборудование</div></div>
+        <div class="step" id="step3"><div class="step-num">3</div><div class="step-text">Генерация layout</div></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title"><span class="dot"></span>PV Модуль</div>
+      <div class="equip-grid" id="moduleGrid"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title"><span class="dot"></span>Конструкция</div>
+      <div class="equip-grid" id="structureGrid"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title"><span class="dot"></span>Инвертор</div>
+      <div class="equip-grid" id="inverterGrid"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title"><span class="dot"></span>Параметры Layout</div>
+      <div class="param-row"><span class="param-label">Pitch (м)</span><input type="number" class="param-input" id="paramPitch" value="6.0" min="3" max="20" step="0.5"></div>
+      <div class="param-row"><span class="param-label">Отступ от границ (м)</span><input type="number" class="param-input" id="paramSetback" value="5" min="0" max="50" step="1"></div>
+      <div class="param-row"><span class="param-label">Азимут (°)</span><input type="number" class="param-input" id="paramAzimuth" value="180" min="0" max="360" step="5"></div>
+      <div class="param-row"><span class="param-label">Модулей в стринге</span><input type="number" class="param-input" id="paramModulesPerString" value="28" min="10" max="40" step="1"></div>
+      <div class="param-row"><span class="param-label">Рядов на столе</span><input type="number" class="param-input" id="paramRowsPerTable" value="2" min="1" max="4" step="1"></div>
+    </div>
+    <div class="panel-section">
+      <button class="btn btn-primary" id="generateBtn" disabled onclick="generateLayout()">⚡ Генерировать Layout</button>
+      <div style="height:8px;"></div>
+      <button class="btn btn-secondary" id="clearLayoutBtn" style="display:none;" onclick="clearLayout()">Очистить layout</button>
+    </div>
+  </div>
+
+  <div class="map-container">
+    <div class="map-hint" id="mapHint">Используйте <span class="kbd">▭</span> инструмент слева, чтобы нарисовать границы участка</div>
+    <div id="map"></div>
+    <div class="generating-overlay" id="genOverlay">
+      <div class="spinner-box"><div class="spinner"></div><div class="spinner-text">Генерация layout…</div></div>
+    </div>
+  </div>
+
+  <div class="panel-right">
+    <div class="panel-section"><div class="panel-section-title"><span class="dot"></span>Статистика проекта</div></div>
+    <div class="stat-card"><div class="stat-label">Площадь участка</div><div class="stat-value" id="statArea">—<span class="unit">га</span></div></div>
+    <div class="stat-card"><div class="stat-label">Количество модулей</div><div class="stat-value" id="statModules">—</div></div>
+    <div class="stat-card"><div class="stat-label">Пиковая мощность DC</div><div class="stat-value" id="statPowerDC">—<span class="unit">MWp</span></div></div>
+    <div class="stat-card"><div class="stat-label">Мощность AC</div><div class="stat-value" id="statPowerAC">—<span class="unit">MW</span></div></div>
+    <div class="stat-card"><div class="stat-label">DC/AC Ratio</div><div class="stat-value" id="statDCAC">—</div></div>
+    <div class="stat-card"><div class="stat-label">Количество инверторов</div><div class="stat-value" id="statInverters">—</div></div>
+    <div class="stat-card"><div class="stat-label">Кол-во стрингов</div><div class="stat-value" id="statStrings">—</div></div>
+    <div class="stat-card"><div class="stat-label">GCR</div><div class="stat-value" id="statGCR">—<span class="unit">%</span></div><div class="stat-sub">Ground Coverage Ratio</div></div>
+    <div class="legend">
+      <div class="panel-section-title"><span class="dot"></span>Легенда</div>
+      <div class="legend-item"><div class="legend-swatch panels"></div>PV Столы</div>
+      <div class="legend-item"><div class="legend-swatch inverter"></div>Инверторы</div>
+      <div class="legend-item"><div class="legend-swatch transformer"></div>Трансформатор</div>
+      <div class="legend-item"><div class="legend-swatch dc-cable"></div>DC Кабель</div>
+      <div class="legend-item"><div class="legend-swatch ac-cable"></div>AC Кабель</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MODULES = [
+  { id:'jinko580', name:'JinKo Tiger Neo 580W', watt:580, width:1.134, height:2.278, efficiency:22.53 },
+  { id:'longi555', name:'LONGi Hi-MO 6 555W', watt:555, width:1.134, height:2.278, efficiency:21.5 },
+  { id:'trina670', name:'Trina Vertex N 670W', watt:670, width:1.303, height:2.384, efficiency:21.6 },
+  { id:'canadian590', name:'Canadian Solar 590W', watt:590, width:1.134, height:2.278, efficiency:22.8 },
+];
+const STRUCTURES = [
+  { id:'tracker1p', name:'Tracker 1P (single-axis)', type:'tracker', tilt:0, tracking:true },
+  { id:'fixed25', name:'Fixed Tilt 25°', type:'fixed', tilt:25, tracking:false },
+  { id:'fixed15', name:'Fixed Tilt 15°', type:'fixed', tilt:15, tracking:false },
+];
+const INVERTERS = [
+  { id:'huawei215', name:'Huawei SUN2000-215KTL', power_kw:215, mppt:10, strings_per_mppt:2 },
+  { id:'sungrow250', name:'Sungrow SG250HX', power_kw:250, mppt:12, strings_per_mppt:2 },
+  { id:'sineng255', name:'Sineng AFI 255KTL', power_kw:255, mppt:12, strings_per_mppt:2 },
+];
+
+let state = {
+  selectedModule: MODULES[0], selectedStructure: STRUCTURES[0], selectedInverter: INVERTERS[0],
+  sitePolygon: null, siteLayer: null, layoutLayers: [], generated: false,
+};
+
+// ── MAP with Google Satellite ──
+const map = L.map('map', { center: [24.45, 54.65], zoom: 15, zoomControl: false });
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  maxZoom: 21, attribution: '© Google',
+}).addTo(map);
+
+L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
+  maxZoom: 21, opacity: 0.55,
+}).addTo(map);
+
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+const drawControl = new L.Control.Draw({
+  position: 'topleft',
+  draw: {
+    polygon: { shapeOptions: { color:'#e8920d', weight:2, fillColor:'rgba(232,146,13,0.15)', fillOpacity:0.15 }, allowIntersection:false },
+    rectangle: { shapeOptions: { color:'#e8920d', weight:2, fillColor:'rgba(232,146,13,0.15)', fillOpacity:0.15 } },
+    polyline:false, circle:false, circlemarker:false, marker:false,
+  },
+  edit: { featureGroup: drawnItems, remove: true },
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, function(e) {
+  drawnItems.clearLayers(); clearLayout();
+  drawnItems.addLayer(e.layer);
+  state.siteLayer = e.layer;
+  state.sitePolygon = e.layer.getLatLngs()[0] || e.layer.getLatLngs();
+  if (Array.isArray(state.sitePolygon[0])) state.sitePolygon = state.sitePolygon[0];
+  const area = computeAreaHa(state.sitePolygon);
+  document.getElementById('statArea').innerHTML = area.toFixed(2)+'<span class="unit">га</span>';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('mapHint').style.display = 'none';
+  updateStep(1,'done'); updateStep(2,'active');
+  updateStatus('Участок: '+area.toFixed(2)+' га');
+  showToast('Участок задан — '+area.toFixed(2)+' га');
+});
+
+map.on(L.Draw.Event.DELETED, function() {
+  state.sitePolygon=null; state.siteLayer=null; clearLayout();
+  document.getElementById('generateBtn').disabled=true;
+  document.getElementById('mapHint').style.display='flex';
+  resetStats();
+  updateStep(1,'active'); updateStep(2,''); updateStep(3,'');
+  updateStatus('Новый проект');
+});
+
+// ── EQUIPMENT UI ──
+function renderEquipmentCards() {
+  document.getElementById('moduleGrid').innerHTML = MODULES.map(m =>
+    `<div class="equip-card ${state.selectedModule.id===m.id?'active':''}" onclick="selectModule('${m.id}')">
+      <div class="equip-card-header"><div class="equip-card-name">${m.name}</div><div class="equip-card-badge">${m.watt}W</div></div>
+      <div class="equip-card-specs">${m.width}×${m.height}m · η ${m.efficiency}%</div></div>`
+  ).join('');
+
+  document.getElementById('structureGrid').innerHTML = STRUCTURES.map(s =>
+    `<div class="equip-card ${state.selectedStructure.id===s.id?'active':''}" onclick="selectStructure('${s.id}')">
+      <div class="equip-card-header"><div class="equip-card-name">${s.name}</div><div class="equip-card-badge">${s.tracking?'TRACKER':s.tilt+'°'}</div></div>
+      <div class="equip-card-specs">${s.tracking?'Single-axis tracking N-S':'Фиксированная конструкция'}</div></div>`
+  ).join('');
+
+  document.getElementById('inverterGrid').innerHTML = INVERTERS.map(inv =>
+    `<div class="equip-card ${state.selectedInverter.id===inv.id?'active':''}" onclick="selectInverter('${inv.id}')">
+      <div class="equip-card-header"><div class="equip-card-name">${inv.name}</div><div class="equip-card-badge">${inv.power_kw}kW</div></div>
+      <div class="equip-card-specs">${inv.mppt} MPPT · ${inv.strings_per_mppt} стр/MPPT</div></div>`
+  ).join('');
+}
+
+function selectModule(id) { state.selectedModule=MODULES.find(m=>m.id===id); renderEquipmentCards(); }
+function selectStructure(id) { state.selectedStructure=STRUCTURES.find(s=>s.id===id); renderEquipmentCards(); }
+function selectInverter(id) { state.selectedInverter=INVERTERS.find(i=>i.id===id); renderEquipmentCards(); }
+renderEquipmentCards();
+
+// ── GEO ──
+function toMeters(latlngs, c) {
+  const R=6371000, cLat=c.lat*Math.PI/180;
+  return latlngs.map(ll => ({ x:(ll.lng-c.lng)*Math.PI/180*R*Math.cos(cLat), y:(ll.lat-c.lat)*Math.PI/180*R }));
+}
+function toLatLng(pts, c) {
+  const R=6371000, cLat=c.lat*Math.PI/180;
+  return pts.map(p => ({ lat:c.lat+(p.y/R)*180/Math.PI, lng:c.lng+(p.x/(R*Math.cos(cLat)))*180/Math.PI }));
+}
+function computeAreaHa(ll) {
+  const c=getCenter(ll), pts=toMeters(ll,c);
+  let a=0; for(let i=0;i<pts.length;i++){const j=(i+1)%pts.length; a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}
+  return Math.abs(a)/2/10000;
+}
+function getCenter(ll) { let lat=0,lng=0; ll.forEach(l=>{lat+=l.lat;lng+=l.lng;}); return {lat:lat/ll.length,lng:lng/ll.length}; }
+
+function pointInPolygon(pt, poly) {
+  let ins=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
+    if(((yi>pt.y)!==(yj>pt.y))&&(pt.x<(xj-xi)*(pt.y-yi)/(yj-yi)+xi)) ins=!ins;
+  }
+  return ins;
+}
+
+function shrinkPolygon(pts, d) {
+  const n=pts.length, r=[];
+  for(let i=0;i<n;i++){
+    const prev=pts[(i-1+n)%n],curr=pts[i],next=pts[(i+1)%n];
+    const e1={x:curr.x-prev.x,y:curr.y-prev.y},e2={x:next.x-curr.x,y:next.y-curr.y};
+    const n1=norm({x:-e1.y,y:e1.x}),n2=norm({x:-e2.y,y:e2.x});
+    const bis=norm({x:n1.x+n2.x,y:n1.y+n2.y});
+    const dot=n1.x*bis.x+n1.y*bis.y;
+    const dd=dot!==0?d/dot:d;
+    r.push({x:curr.x+bis.x*dd,y:curr.y+bis.y*dd});
+  }
+  return r;
+}
+function norm(v){const l=Math.sqrt(v.x*v.x+v.y*v.y);return l===0?{x:0,y:0}:{x:v.x/l,y:v.y/l};}
+
+function getBBox(pts){let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;pts.forEach(p=>{if(p.x<a)a=p.x;if(p.y<b)b=p.y;if(p.x>c)c=p.x;if(p.y>d)d=p.y;});return{minX:a,minY:b,maxX:c,maxY:d};}
+
+// ── LAYOUT ──
+function generateLayout() {
+  if(!state.sitePolygon) return;
+  clearLayout();
+  document.getElementById('genOverlay').classList.add('active');
+  updateStep(2,'done'); updateStep(3,'active');
+
+  setTimeout(()=>{
+    const mod=state.selectedModule, inv=state.selectedInverter;
+    const pitch=parseFloat(document.getElementById('paramPitch').value)||6;
+    const setback=parseFloat(document.getElementById('paramSetback').value)||5;
+    const mps=parseInt(document.getElementById('paramModulesPerString').value)||28;
+    const rpt=parseInt(document.getElementById('paramRowsPerTable').value)||2;
+
+    const center=getCenter(state.sitePolygon);
+    const poly=toMeters(state.sitePolygon,center);
+    const inner=shrinkPolygon(poly,setback);
+    const bb=getBBox(inner);
+
+    const tw=mod.width*mps, th=mod.height*rpt, gx=1.5;
+    const tables=[];
+
+    for(let y=bb.minY;y<bb.maxY;y+=pitch){
+      for(let x=bb.minX;x<bb.maxX;x+=tw+gx){
+        const corners=[{x,y},{x:x+tw,y},{x:x+tw,y:y+th},{x,y:y+th}];
+        if(corners.every(c=>pointInPolygon(c,inner))){
+          tables.push({cx:x+tw/2,cy:y+th/2,w:tw,h:th,corners});
+        }
+      }
+    }
+
+    const totalMod=tables.length*mps*rpt;
+    const spi=inv.mppt*inv.strings_per_mppt;
+    const totalStr=tables.length;
+    const numInv=Math.ceil(totalStr/spi);
+
+    tables.forEach(t=>{
+      const lls=toLatLng(t.corners,center);
+      const p=L.polygon(lls.map(l=>[l.lat,l.lng]),{color:'#e8920d',weight:0.6,fillColor:'#f7b731',fillOpacity:0.5});
+      p.addTo(map); state.layoutLayers.push(p);
+    });
+
+    const invPos=[];
+    if(numInv>0&&tables.length>0){
+      const cy=(bb.minY+bb.maxY)/2, sp=(bb.maxX-bb.minX)/(numInv+1);
+      for(let i=0;i<numInv;i++){
+        const ix=bb.minX+sp*(i+1);
+        if(pointInPolygon({x:ix,y:cy},inner)) invPos.push({x:ix,y:cy});
+      }
+    }
+
+    invPos.forEach(pos=>{
+      const ll=toLatLng([pos],center)[0];
+      const m=L.circleMarker([ll.lat,ll.lng],{radius:5,color:'#7c3aed',fillColor:'#7c3aed',fillOpacity:0.9,weight:2});
+      m.bindTooltip('Инвертор '+inv.name,{direction:'top'}); m.addTo(map); state.layoutLayers.push(m);
+    });
+
+    const tp={x:(bb.minX+bb.maxX)/2,y:(bb.minY+bb.maxY)/2};
+    const tll=toLatLng([tp],center)[0];
+    const tr=L.circleMarker([tll.lat,tll.lng],{radius:7,color:'#e8640d',fillColor:'#e8640d',fillOpacity:0.9,weight:2});
+    tr.bindTooltip('Трансформатор',{direction:'top'}); tr.addTo(map); state.layoutLayers.push(tr);
+
+    if(invPos.length>0){
+      tables.forEach((t,idx)=>{
+        if(idx%4!==0) return;
+        let md=Infinity,nr=invPos[0];
+        invPos.forEach(iv=>{const d=Math.hypot(t.cx-iv.x,t.cy-iv.y);if(d<md){md=d;nr=iv;}});
+        const f=toLatLng([{x:t.cx,y:t.cy}],center)[0], to=toLatLng([nr],center)[0];
+        const l=L.polyline([[f.lat,f.lng],[to.lat,to.lng]],{color:'#d63a3a',weight:1,opacity:0.4,dashArray:'4 4'});
+        l.addTo(map); state.layoutLayers.push(l);
+      });
+    }
+
+    invPos.forEach(iv=>{
+      const f=toLatLng([iv],center)[0];
+      const l=L.polyline([[f.lat,f.lng],[tll.lat,tll.lng]],{color:'#2563eb',weight:2.5,opacity:0.7});
+      l.addTo(map); state.layoutLayers.push(l);
+    });
+
+    const pDC=totalMod*mod.watt/1e6, pAC=numInv*inv.power_kw/1000;
+    const dcac=pAC>0?(pDC/pAC).toFixed(2):'—';
+    const area=computeAreaHa(state.sitePolygon);
+    const gcr=area>0?((tables.length*tw*th/(area*10000))*100).toFixed(1):0;
+
+    document.getElementById('statModules').textContent=totalMod.toLocaleString();
+    document.getElementById('statPowerDC').innerHTML=pDC.toFixed(2)+'<span class="unit">MWp</span>';
+    document.getElementById('statPowerAC').innerHTML=pAC.toFixed(2)+'<span class="unit">MW</span>';
+    document.getElementById('statDCAC').textContent=dcac;
+    document.getElementById('statInverters').textContent=numInv;
+    document.getElementById('statStrings').textContent=totalStr.toLocaleString();
+    document.getElementById('statGCR').innerHTML=gcr+'<span class="unit">%</span>';
+
+    document.getElementById('genOverlay').classList.remove('active');
+    document.getElementById('clearLayoutBtn').style.display='block';
+    state.generated=true;
+    updateStep(3,'done');
+    updateStatus('Layout: '+pDC.toFixed(1)+' MWp · '+totalMod.toLocaleString()+' модулей');
+    showToast('Layout готов — '+pDC.toFixed(2)+' MWp');
+  },700);
+}
+
+function clearLayout(){
+  state.layoutLayers.forEach(l=>map.removeLayer(l)); state.layoutLayers=[];
+  state.generated=false;
+  document.getElementById('clearLayoutBtn').style.display='none';
+  resetStats(true);
+}
+
+function resetStats(keepArea){
+  if(!keepArea) document.getElementById('statArea').innerHTML='—<span class="unit">га</span>';
+  document.getElementById('statModules').textContent='—';
+  document.getElementById('statPowerDC').innerHTML='—<span class="unit">MWp</span>';
+  document.getElementById('statPowerAC').innerHTML='—<span class="unit">MW</span>';
+  document.getElementById('statDCAC').textContent='—';
+  document.getElementById('statInverters').textContent='—';
+  document.getElementById('statStrings').textContent='—';
+  document.getElementById('statGCR').innerHTML='—<span class="unit">%</span>';
+}
+
+function resetProject(){
+  drawnItems.clearLayers(); clearLayout();
+  state.sitePolygon=null; state.siteLayer=null;
+  document.getElementById('generateBtn').disabled=true;
+  document.getElementById('mapHint').style.display='flex';
+  resetStats();
+  updateStep(1,'active'); updateStep(2,''); updateStep(3,'');
+  updateStatus('Новый проект');
+}
+
+function updateStep(n,s){document.getElementById('step'+n).className='step '+s;}
+function updateStatus(t){document.getElementById('statusText').textContent=t;}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+</script>
+</body>
+</html>
