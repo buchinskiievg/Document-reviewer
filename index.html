@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolarFlow — PV Layout Generator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{--bg:#f4f5f7;--pn:#fff;--cd:#f8f9fb;--ch:#eef0f4;--ca:#eef4ff;--bd:#e2e5eb;--t1:#1a1d26;--t2:#5a6070;--t3:#8b90a0;--ac:#2563eb;--al:#eef4ff;--ag:rgba(37,99,235,.15);--gn:#1a9e5c;--gb:#e8f8ef;--r:8px;--sh:0 1px 3px rgba(0,0,0,.06);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--t1);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+.top{height:48px;background:var(--pn);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:1000;box-shadow:var(--sh);}
+.logo{display:flex;align-items:center;gap:7px;font-weight:700;font-size:16px;}
+.logo-i{width:26px;height:26px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.top-d{width:1px;height:22px;background:var(--bd);}
+.top-s{font-size:11px;color:var(--t3);font-family:'IBM Plex Mono',monospace;}
+.top-r{margin-left:auto;display:flex;gap:5px;align-items:center;}
+.top-r label{font-size:10px;color:var(--t3);}
+.top-r input[type=color]{width:22px;height:22px;border:1px solid var(--bd);border-radius:4px;cursor:pointer;padding:0;}
+.main{display:flex;flex:1;overflow:hidden;}
+.pl{width:330px;background:var(--pn);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.ps{padding:10px 12px;border-bottom:1px solid var(--bd);}
+.pst{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1.3px;color:var(--t3);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.pst .d{width:4px;height:4px;border-radius:50%;background:var(--ac);}
+.cg{margin-bottom:3px;}
+.cm{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--cd);border:1.5px solid var(--bd);border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .1s;}
+.cm:hover{background:var(--ch);}
+.cm.op{border-radius:6px 6px 0 0;background:var(--ch);border-bottom-color:transparent;}
+.cm .ar{font-size:8px;color:var(--t3);transition:transform .15s;}
+.cm.op .ar{transform:rotate(90deg);}
+.cm .mb{font-size:8px;font-family:'IBM Plex Mono',monospace;color:var(--t3);}
+.cls{display:none;border:1.5px solid var(--bd);border-top:none;border-radius:0 0 6px 6px;overflow:hidden;}
+.cls.op{display:block;}
+.mi{padding:5px 8px;cursor:pointer;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;font-size:10px;}
+.mi:last-child{border-bottom:none;}
+.mi:hover{background:var(--ch);}
+.mi.ac{background:var(--ca);box-shadow:inset 3px 0 0 var(--ac);}
+.mn{font-weight:500;}.ms2{font-size:8px;color:var(--t3);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+.mbg{font-size:8px;font-family:'IBM Plex Mono',monospace;font-weight:500;padding:1px 5px;border-radius:3px;background:var(--al);color:var(--ac);white-space:nowrap;}
+.pr{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.pl2{font-size:10px;color:var(--t2);font-weight:500;}
+.pi{background:var(--cd);border:1.5px solid var(--bd);border-radius:5px;color:var(--t1);padding:4px 7px;font-size:10px;font-family:'IBM Plex Mono',monospace;width:85px;outline:none;}
+.pi:focus{border-color:var(--ac);}
+.pc{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
+.pc input[type=checkbox]{accent-color:var(--ac);}
+.pc label{font-size:10px;color:var(--t2);cursor:pointer;}
+.btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border-radius:var(--r);font-size:11px;font-weight:600;font-family:'Outfit',sans-serif;border:none;cursor:pointer;transition:all .15s;width:100%;}
+.bp{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.2);}
+.bp:hover{transform:translateY(-1px);}.bp:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+.bs{background:var(--cd);color:var(--t2);border:1.5px solid var(--bd);}.bs:hover{background:var(--ch);}
+.be{background:#059669;color:#fff;}.be:hover{background:#047857;}.be:disabled{opacity:.35;cursor:not-allowed;}
+.bsm{padding:4px 10px;font-size:10px;border-radius:5px;width:auto;}
+.mc{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+.leaflet-draw-toolbar a{background-color:#fff !important;background-size:300px 30px !important;width:28px !important;height:28px !important;line-height:28px !important;}
+.leaflet-draw-toolbar{border:none !important;box-shadow:0 2px 8px rgba(0,0,0,.12) !important;border-radius:6px !important;overflow:hidden;}
+.leaflet-bar{border:none !important;box-shadow:0 2px 8px rgba(0,0,0,.12) !important;border-radius:6px !important;overflow:hidden;}
+.leaflet-bar a{background:#fff !important;color:var(--t1) !important;border-bottom:1px solid var(--bd) !important;width:28px !important;height:28px !important;line-height:28px !important;font-size:14px !important;}
+.leaflet-bar a:last-child{border-bottom:none !important;}.leaflet-bar a:hover{background:var(--ch) !important;}
+.mh{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.9);border:1px solid var(--bd);border-radius:var(--r);padding:8px 16px;font-size:11px;color:var(--t2);z-index:999;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.rp{width:240px;background:var(--pn);border-left:1px solid var(--bd);flex-shrink:0;overflow-y:auto;}
+.sc{padding:8px 11px;border-bottom:1px solid var(--bd);}
+.sl{font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;font-weight:500;margin-bottom:1px;}
+.sv{font-size:16px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+.sv .u{font-size:10px;font-weight:500;color:var(--t3);margin-left:2px;}
+.lg{padding:10px 11px;border-bottom:1px solid var(--bd);}
+.li{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:10px;color:var(--t2);}
+.lw{width:14px;height:3px;border-radius:1px;flex-shrink:0;}
+.steps{display:flex;flex-direction:column;gap:4px;}
+.step{display:flex;align-items:center;gap:6px;font-size:10px;}
+.sn{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;background:var(--cd);border:1.5px solid var(--bd);color:var(--t3);flex-shrink:0;}
+.step.done .sn{background:var(--gb);border-color:var(--gn);color:var(--gn);}
+.step.active .sn{background:var(--al);border-color:var(--ac);color:var(--ac);}
+.st2{color:var(--t3);}.step.done .st2{color:var(--t2);}.step.active .st2{color:var(--t1);font-weight:600;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px;}
+.toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--gn);color:#fff;padding:7px 16px;border-radius:var(--r);font-size:11px;font-weight:600;z-index:9999;transition:transform .35s cubic-bezier(.34,1.56,.64,1);pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.ov{position:absolute;inset:0;background:rgba(255,255,255,.5);display:none;align-items:center;justify-content:center;z-index:998;}
+.ov.active{display:flex;}
+.sp{width:28px;height:28px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 8px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.mbg2{position:fixed;inset:0;background:rgba(0,0,0,.18);display:none;align-items:center;justify-content:center;z-index:2000;}
+.mbg2.active{display:flex;}
+.modal{background:var(--pn);border-radius:12px;padding:18px;width:420px;box-shadow:0 16px 48px rgba(0,0,0,.12);max-height:78vh;overflow-y:auto;}
+.modal h3{font-size:13px;font-weight:700;margin-bottom:3px;}
+.modal p{font-size:10px;color:var(--t2);margin-bottom:10px;line-height:1.4;}
+.azp{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:10px;background:var(--cd);border-radius:8px;border:1px solid var(--bd);}
+.azi{flex:1;}.azv{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--ac);}
+.azl{font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;}
+.azd{font-size:10px;color:var(--t2);margin-top:2px;}
+.mr2{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.mr2 label{font-size:10px;font-weight:500;color:var(--t2);width:150px;flex-shrink:0;}
+.mr2 input{flex:1;background:var(--cd);border:1.5px solid var(--bd);border-radius:5px;color:var(--t1);padding:5px 7px;font-size:10px;font-family:'IBM Plex Mono',monospace;outline:none;}
+.mr2 input:focus{border-color:var(--ac);}
+.msep{border:none;border-top:1px solid var(--bd);margin:10px 0;}
+.msub{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:7px;}
+.ma{display:flex;gap:6px;margin-top:12px;}.ma .btn{flex:1;}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo"><div class="logo-i">⚡</div>SolarFlow</div>
+  <div class="top-d"></div>
+  <div class="top-s" id="sts">Новый проект</div>
+  <div class="top-r">
+    <label>Цвет:</label><input type="color" id="pvCol" value="#5c3a1e" title="Цвет панелей">
+    <button class="btn be bsm" id="expBtn" disabled onclick="expDXF()">📐 DXF</button>
+    <button class="btn bs bsm" onclick="resetAll()">Сброс</button>
+  </div>
+</div>
+<div class="main">
+<div class="pl">
+  <div class="ps"><div class="pst"><span class="d"></span>Этапы</div>
+    <div class="steps">
+      <div class="step active" id="s1"><div class="sn">1</div><div class="st2">Участок</div></div>
+      <div class="step" id="s2"><div class="sn">2</div><div class="st2">Оборудование</div></div>
+      <div class="step" id="s3"><div class="sn">3</div><div class="st2">Настройки</div></div>
+      <div class="step" id="s4"><div class="sn">4</div><div class="st2">Генерация</div></div>
+    </div></div>
+  <div class="ps"><div class="pst"><span class="d"></span>PV Модули</div><div id="mC"></div></div>
+  <div class="ps"><div class="pst"><span class="d"></span>Инверторы</div><div id="iC"></div></div>
+  <div class="ps"><div class="pst"><span class="d"></span>Конструкция</div><div id="sC"></div></div>
+  <div class="ps"><div class="pst"><span class="d"></span>Параметры</div>
+    <div class="pr"><span class="pl2">Отступ (м)</span><input type="number" class="pi" id="pSB" value="15" min="0" max="100" step="1"></div>
+    <div class="pr"><span class="pl2">Между рядами (м)</span><input type="number" class="pi" id="pRS" value="7" min="2" max="30" step=".5"></div>
+    <div class="pr"><span class="pl2">Мод. в стринге</span><input type="number" class="pi" id="pMP" value="28" min="10" max="40" step="1"></div>
+    <div class="pr"><span class="pl2">Рядов на столе</span><input type="number" class="pi" id="pRP" value="2" min="1" max="4" step="1"></div>
+    <div class="pc"><input type="checkbox" id="pSM"><label for="pSM">Показывать модули</label></div>
+  </div>
+  <div class="ps">
+    <button class="btn bp" id="gBtn" disabled onclick="startG()">⚡ Генерировать</button>
+    <div style="height:4px"></div>
+    <button class="btn bs" id="cBtn" style="display:none" onclick="clrL()">Очистить</button>
+  </div>
+</div>
+<div class="mc">
+  <div class="mh" id="mhint">Нарисуйте участок ▭ / ⬠ на панели слева</div>
+  <div id="map"></div>
+  <div class="ov" id="ov"><div><div class="sp"></div><div style="font-size:11px;color:var(--t2)">Генерация…</div></div></div>
+</div>
+<div class="rp">
+  <div class="ps"><div class="pst"><span class="d"></span>Статистика</div></div>
+  <div class="sc"><div class="sl">Площадь</div><div class="sv" id="xA">—<span class="u">га</span></div></div>
+  <div class="sc"><div class="sl">Модулей</div><div class="sv" id="xM">—</div></div>
+  <div class="sc"><div class="sl">DC</div><div class="sv" id="xD">—<span class="u">MWp</span></div></div>
+  <div class="sc"><div class="sl">AC</div><div class="sv" id="xC">—<span class="u">MW</span></div></div>
+  <div class="sc"><div class="sl">DC/AC</div><div class="sv" id="xR">—</div></div>
+  <div class="sc"><div class="sl">Инверторы</div><div class="sv" id="xI">—</div></div>
+  <div class="sc"><div class="sl">Стрингов</div><div class="sv" id="xS">—</div></div>
+  <div class="sc"><div class="sl">GCR</div><div class="sv" id="xG">—<span class="u">%</span></div></div>
+  <div class="lg">
+    <div class="pst"><span class="d"></span>Легенда</div>
+    <div class="li"><div class="lw" id="lgPv" style="background:#5c3a1e"></div>PV Столы</div>
+    <div class="li"><div class="lw" style="background:#7c3aed"></div>Инверторы</div>
+    <div class="li"><div class="lw" style="background:#e8640d"></div>MV Станция</div>
+    <div class="li"><div class="lw" style="background:#6b7280"></div>Дорога</div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="mbg2" id="setM">
+<div class="modal">
+<h3>Настройки генерации</h3>
+<p>Азимут рассчитан по форме участка.</p>
+<div class="azp"><canvas id="azCv" width="70" height="70"></canvas><div class="azi"><div class="azl">Азимут</div><div class="azv" id="azV">180°</div><div class="azd" id="azD">Юг</div></div></div>
+<div class="mr2"><label>Азимут (°)</label><input type="number" id="mAz" value="180" min="0" max="360" step="1" oninput="drCmp()"></div>
+<div class="mr2"><label>Между рядами (м)</label><input type="number" id="mRS" value="7" min="2" max="30" step=".5"></div>
+<hr class="msep"><div class="msub">🛤 Дороги</div>
+<div class="pc"><input type="checkbox" id="mRP" checked><label for="mRP">Периметральная (внутри участка)</label></div>
+<div class="pc"><input type="checkbox" id="mRI" checked><label for="mRI">Центральная (инверторная)</label></div>
+<div class="mr2"><label>Ширина дороги (м)</label><input type="number" id="mRW" value="5" min="3" max="12" step=".5"></div>
+<div class="mr2"><label>Радиус скругл. (м)</label><input type="number" id="mRR" value="12" min="5" max="30" step="1"></div>
+<div class="ma"><button class="btn bs" onclick="clsMod()">Отмена</button><button class="btn bp" onclick="cfmG()">Подтвердить</button></div>
+</div></div>
+
+<script>
+// ═══ CATALOG ═══
+const MC={'JinKo':[{id:'jk580',n:'Tiger Neo 580W',W:580,w:1.134,h:2.278,e:22.5},{id:'jk615',n:'Tiger Neo 615W',W:615,w:1.134,h:2.382,e:22.8}],'LONGi':[{id:'lo555',n:'Hi-MO 6 555W',W:555,w:1.134,h:2.278,e:21.5},{id:'lo590',n:'Hi-MO 7 590W',W:590,w:1.134,h:2.278,e:22.8},{id:'lo620',n:'Hi-MO X6 620W',W:620,w:1.134,h:2.382,e:23}],'Trina':[{id:'tr670',n:'Vertex N 670W',W:670,w:1.303,h:2.384,e:21.6},{id:'tr585',n:'Vertex S+ 585W',W:585,w:1.134,h:2.278,e:22.6},{id:'tr710',n:'Vertex N 710W',W:710,w:1.303,h:2.384,e:22.9}],'Canadian':[{id:'cs590',n:'HiKu7 590W',W:590,w:1.134,h:2.278,e:22.8}],'JA Solar':[{id:'ja580',n:'DeepBlue 580W',W:580,w:1.134,h:2.278,e:22.4}],'Risen':[{id:'ri700',n:'Titan 700W',W:700,w:1.303,h:2.384,e:22.5}]};
+const IC={'Huawei (Стр.)':[{id:'hw215',n:'SUN2000-215KTL',pw:215,mp:10,sp:2,t:'s',sw:1.05,sh:.55}],'Sungrow (Стр.)':[{id:'sg250',n:'SG250HX',pw:250,mp:12,sp:2,t:'s',sw:1.05,sh:.66},{id:'sg320',n:'SG320HX',pw:320,mp:12,sp:2,t:'s',sw:1.05,sh:.66}],'Sungrow (Конт.)':[{id:'sg34c',n:'SG3400HV 3.4MW',pw:3400,mp:1,sp:120,t:'c',sw:6.1,sh:2.6},{id:'sg50c',n:'SG5000HV 5MW',pw:5000,mp:1,sp:180,t:'c',sw:6.1,sh:2.6},{id:'sg62c',n:'SG6250HV 6.25MW',pw:6250,mp:1,sp:220,t:'c',sw:12.2,sh:2.6}],'Sineng (Стр.)':[{id:'sn255',n:'AFI 255KTL',pw:255,mp:12,sp:2,t:'s',sw:1.05,sh:.55}],'Sineng (Конт.)':[{id:'sn50c',n:'PVS-5000 5MW',pw:5000,mp:1,sp:170,t:'c',sw:6.1,sh:2.6}],'PowerElec (Конт.)':[{id:'pe46c',n:'FS4600 4.6MW',pw:4600,mp:1,sp:160,t:'c',sw:6.1,sh:2.6}]};
+const XC={'Трекеры':[{id:'t1p',n:'1P N-S Tracker',t:'tracker',tl:0,tr:true}],'Фикс.':[{id:'f25',n:'Fixed 25°',t:'f',tl:25,tr:false},{id:'f20',n:'Fixed 20°',t:'f',tl:20,tr:false},{id:'f15',n:'Fixed 15°',t:'f',tl:15,tr:false}]};
+
+let G={mod:MC['JinKo'][0],inv:IC['Huawei (Стр.)'][0],str:XC['Трекеры'][0],poly:null,lay:null,ls:[],az:180,dxf:null};
+
+function rc(cid,cat,sid,gi){const el=document.getElementById(cid);el.innerHTML='';for(const mf in cat){const ms=cat[mf],ha=ms.some(m=>m.id===sid);const g=document.createElement('div');g.className='cg';
+g.innerHTML=`<div class="cm${ha?' op':''}" onclick="this.classList.toggle('op');this.nextElementSibling.classList.toggle('op')"><span>${mf}</span><span><span class="mb">${ms.length}</span> <span class="ar">▸</span></span></div><div class="cls${ha?' op':''}">
+${ms.map(m=>`<div class="mi${m.id===sid?' ac':''}" onclick="cs('${cid}','${m.id}')"><div><div class="mn">${m.n}</div><div class="ms2">${gi(m)}</div></div><div class="mbg">${bg(m)}</div></div>`).join('')}</div>`;el.appendChild(g);}}
+function bg(m){if(m.W)return m.W+'W';if(m.pw&&m.t==='c')return(m.pw/1000).toFixed(1)+'MW';if(m.pw)return m.pw+'kW';if(m.tr)return'TRACK';return m.tl+'°';}
+function rAll(){rc('mC',MC,G.mod.id,m=>`${m.w}×${m.h}m η${m.e}%`);rc('iC',IC,G.inv.id,m=>m.t==='c'?`${(m.pw/1000).toFixed(1)}MW ${m.sw}×${m.sh}m`:`${m.mp}MPPT`);rc('sC',XC,G.str.id,m=>m.tr?'Tracking':'Фикс '+m.tl+'°');}
+function cs(c,id){const cats={mC:MC,iC:IC,sC:XC},ks={mC:'mod',iC:'inv',sC:'str'};for(const mf in cats[c]){const f=cats[c][mf].find(m=>m.id===id);if(f){G[ks[c]]=f;break;}}rAll();}
+rAll();
+
+// ═══ MAP ═══
+const map=L.map('map',{center:[24.45,54.65],zoom:15,zoomControl:false});
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{maxZoom:21}).addTo(map);
+L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',{maxZoom:21,opacity:.4}).addTo(map);
+const dI=new L.FeatureGroup();map.addLayer(dI);
+map.addControl(new L.Control.Draw({position:'topleft',draw:{polygon:{shapeOptions:{color:'#f97316',weight:2.5,fillColor:'rgba(249,115,22,.06)',fillOpacity:.06,dashArray:'8 4'},allowIntersection:false},rectangle:{shapeOptions:{color:'#f97316',weight:2.5,fillColor:'rgba(249,115,22,.06)',fillOpacity:.06,dashArray:'8 4'}},polyline:false,circle:false,circlemarker:false,marker:false},edit:{featureGroup:dI,remove:true}}));
+
+map.on(L.Draw.Event.CREATED,function(e){dI.clearLayers();clrL();dI.addLayer(e.layer);G.lay=e.layer;G.poly=e.layer.getLatLngs()[0]||e.layer.getLatLngs();if(Array.isArray(G.poly[0]))G.poly=G.poly[0];
+const a=aH(G.poly);$('xA').innerHTML=a.toFixed(2)+'<span class="u">га</span>';$('gBtn').disabled=false;$('mhint').style.display='none';ss(1,'done');ss(2,'active');stx('Участок: '+a.toFixed(2)+' га');tst('Участок — '+a.toFixed(2)+' га');cAz();});
+map.on(L.Draw.Event.DELETED,function(){G.poly=null;G.lay=null;clrL();$('gBtn').disabled=true;$('mhint').style.display='flex';rSt();ss(1,'active');ss(2,'');ss(3,'');ss(4,'');stx('Новый проект');});
+
+// ═══ GEO ═══
+const RE=6371000;
+function tM(ll,c){const cl=c.lat*Math.PI/180;return ll.map(l=>({x:(l.lng-c.lng)*Math.PI/180*RE*Math.cos(cl),y:(l.lat-c.lat)*Math.PI/180*RE}));}
+function tL(p,c){const cl=c.lat*Math.PI/180;return p.map(pt=>({lat:c.lat+pt.y/RE*180/Math.PI,lng:c.lng+pt.x/(RE*Math.cos(cl))*180/Math.PI}));}
+function aH(ll){const c=cn(ll),p=tM(ll,c);let a=0;for(let i=0;i<p.length;i++){const j=(i+1)%p.length;a+=p[i].x*p[j].y-p[j].x*p[i].y;}return Math.abs(a)/2/10000;}
+function cn(ll){let a=0,b=0;ll.forEach(l=>{a+=l.lat;b+=l.lng;});return{lat:a/ll.length,lng:b/ll.length};}
+function pip(pt,po){let ins=false;for(let i=0,j=po.length-1;i<po.length;j=i++){const xi=po[i].x,yi=po[i].y,xj=po[j].x,yj=po[j].y;if(((yi>pt.y)!==(yj>pt.y))&&(pt.x<(xj-xi)*(pt.y-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+
+function shrk(pts,d){
+  const n=pts.length,r=[];
+  for(let i=0;i<n;i++){
+    const p=pts[(i-1+n)%n],c=pts[i],nx=pts[(i+1)%n];
+    const e1x=c.x-p.x,e1y=c.y-p.y,e2x=nx.x-c.x,e2y=nx.y-c.y;
+    const l1=Math.hypot(e1x,e1y),l2=Math.hypot(e2x,e2y);
+    if(l1===0||l2===0){r.push({x:c.x,y:c.y});continue;}
+    const n1x=-e1y/l1,n1y=e1x/l1,n2x=-e2y/l2,n2y=e2x/l2;
+    let bx=n1x+n2x,by=n1y+n2y,bl=Math.hypot(bx,by);
+    if(bl<0.001){r.push({x:c.x+n1x*d,y:c.y+n1y*d});continue;}
+    bx/=bl;by/=bl;
+    const dot=n1x*bx+n1y*by;
+    const dd=dot>0.1?d/dot:d*2;
+    r.push({x:c.x+bx*dd,y:c.y+by*dd});
+  }
+  return r;
+}
+
+// Smooth polygon corners with arcs
+function smoothPoly(pts,radius){
+  const n=pts.length,result=[];
+  for(let i=0;i<n;i++){
+    const p=pts[(i-1+n)%n],c=pts[i],nx=pts[(i+1)%n];
+    const d1x=p.x-c.x,d1y=p.y-c.y,d2x=nx.x-c.x,d2y=nx.y-c.y;
+    const l1=Math.hypot(d1x,d1y),l2=Math.hypot(d2x,d2y);
+    const maxR=Math.min(radius,l1/3,l2/3);
+    if(maxR<1){result.push(c);continue;}
+    // Points on edges at distance maxR from corner
+    const t1={x:c.x+d1x/l1*maxR,y:c.y+d1y/l1*maxR};
+    const t2={x:c.x+d2x/l2*maxR,y:c.y+d2y/l2*maxR};
+    // Add arc approximation (3 intermediate points)
+    result.push(t1);
+    const mid={x:(t1.x+t2.x)/2,y:(t1.y+t2.y)/2};
+    // Push mid toward corner slightly for better curve
+    const mx=(mid.x+c.x)/2,my=(mid.y+c.y)/2;
+    const q1={x:(t1.x+mx)/2,y:(t1.y+my)/2};
+    const q2={x:(t2.x+mx)/2,y:(t2.y+my)/2};
+    result.push(q1,{x:mx,y:my},q2,t2);
+  }
+  return result;
+}
+
+function bx(pts){let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;pts.forEach(p=>{if(p.x<a)a=p.x;if(p.y<b)b=p.y;if(p.x>c)c=p.x;if(p.y>d)d=p.y;});return{x0:a,y0:b,x1:c,y1:d};}
+
+// AABB overlap
+function aabbOv(a,b){return!(a.x1<b.x0||b.x1<a.x0||a.y1<b.y0||b.y1<a.y0);}
+
+// ═══ AZIMUTH ═══
+function cAz(){if(!G.poly)return;const c=cn(G.poly),p=tM(G.poly,c);let ml=0,ba=0;
+for(let i=0;i<p.length;i++){const j=(i+1)%p.length,dx=p[j].x-p[i].x,dy=p[j].y-p[i].y,l=Math.hypot(dx,dy);if(l>ml){ml=l;ba=Math.atan2(dx,dy)*180/Math.PI;}}
+let r=(ba+90)%360;if(r<0)r+=360;if(r>270||r<90)r=(r+180)%360;G.az=Math.round(r);}
+
+function opnMod(){$('mAz').value=G.az;$('mRS').value=$('pRS').value;$('setM').classList.add('active');drCmp();}
+function clsMod(){$('setM').classList.remove('active');}
+function drCmp(){const az=+$('mAz').value||180;$('azV').textContent=az+'°';
+let d='';if(az>=350||az<=10)d='Север';else if(az>=170&&az<=190)d='Юг';else if(az>=80&&az<=100)d='Восток';else if(az>=260&&az<=280)d='Запад';else if(az>10&&az<80)d='СВ';else if(az>100&&az<170)d='ЮВ';else if(az>190&&az<260)d='ЮЗ';else d='СЗ';
+$('azD').textContent=d;
+const cv=$('azCv'),x=cv.getContext('2d'),w=cv.width,cx=w/2,r2=26;x.clearRect(0,0,w,w);x.beginPath();x.arc(cx,cx,r2,0,Math.PI*2);x.strokeStyle='#e2e5eb';x.lineWidth=1.5;x.stroke();x.font='7px IBM Plex Mono';x.fillStyle='#8b90a0';x.textAlign='center';x.fillText('N',cx,cx-r2-2);x.fillText('S',cx,cx+r2+7);
+const a2=(az-90)*Math.PI/180;x.beginPath();x.moveTo(cx,cx);x.lineTo(cx+Math.cos(a2)*r2*.7,cx+Math.sin(a2)*r2*.7);x.strokeStyle='#2563eb';x.lineWidth=2;x.lineCap='round';x.stroke();}
+function startG(){if(!G.poly)return;ss(2,'done');ss(3,'active');opnMod();}
+function cfmG(){G.az=+$('mAz').value||180;$('pRS').value=$('mRS').value;clsMod();ss(3,'done');ss(4,'active');gen();}
+
+// ═══ GENERATE ═══
+function gen(){
+  if(!G.poly)return;clrL();$('ov').classList.add('active');
+  requestAnimationFrame(()=>setTimeout(doGen,30));
+}
+
+function doGen(){
+  const mod=G.mod,inv=G.inv,col=$('pvCol').value;
+  const sb=+$('pSB').value||15;
+  const rs=+$('pRS').value||7;
+  const mps=+$('pMP').value||28;
+  const rpt=+$('pRP').value||2;
+  const showM=$('pSM').checked;
+  const doRoadP=$('mRP').checked;
+  const doRoadC=$('mRI').checked;
+  const roadW=+$('mRW').value||5;
+  const roadR=+$('mRR').value||12;
+
+  const ct=cn(G.poly),pm=tM(G.poly,ct);
+  const dxf={site:[],sb:[],tables:[],inv:[],mv:null,roads:[]};
+  dxf.site=pm.map(p=>({x:p.x,y:p.y}));
+
+  // ── ZONING (all INSIDE site boundary) ──
+  // Layer 1: Setback boundary (inside site by sb meters)
+  const setbackPoly=shrk(pm,sb);
+  dxf.sb=setbackPoly.map(p=>({x:p.x,y:p.y}));
+
+  // Layer 2: Perimeter road INSIDE setback
+  // Road outer edge = setback line
+  // Road inner edge = setback + roadW
+  const roadOuterPoly=doRoadP?setbackPoly:null;
+  const roadInnerPoly=doRoadP?shrk(pm,sb+roadW):null;
+
+  // Smooth the road polygons
+  const roadOuterSmooth=doRoadP?smoothPoly(roadOuterPoly,roadR):null;
+  const roadInnerSmooth=doRoadP?smoothPoly(roadInnerPoly,roadR):null;
+
+  // Layer 3: Panel zone = inside road inner edge (or setback if no road)
+  const panelBoundary=doRoadP?shrk(pm,sb+roadW+1):shrk(pm,sb+1);
+  const panelBB=bx(panelBoundary);
+
+  // Layer 4: Central road + inverter pads
+  // Central road runs horizontally through center of panel zone
+  const pcx=(panelBB.x0+panelBB.x1)/2;
+  const pcy=(panelBB.y0+panelBB.y1)/2;
+
+  // Exclusion zones (AABB): things panels cannot overlap
+  const excl=[];
+
+  // MV station at center
+  const mvW=12,mvH=8,mvPad=12;
+  const mvExcl={x0:pcx-mvW/2-mvPad,y0:pcy-mvH/2-mvPad,x1:pcx+mvW/2+mvPad,y1:pcy+mvH/2+mvPad};
+  excl.push(mvExcl);
+
+  // Central road band
+  const crHalf=doRoadC?(roadW/2+1):0;
+  const crExcl=doRoadC?{x0:panelBB.x0-10,y0:pcy-crHalf,x1:panelBB.x1+10,y1:pcy+crHalf}:null;
+  if(crExcl)excl.push(crExcl);
+
+  // Calculate inverter count and place them WITH pads along central road
+  const spi=inv.t==='c'?inv.sp:inv.mp*inv.sp;
+  // We'll calculate actual table count after placement, but estimate first
+  const tw=mod.w*mps,th=mod.h*rpt;
+  const estArea=(panelBB.x1-panelBB.x0)*(panelBB.y1-panelBB.y0);
+  const estTables=Math.floor(estArea/(tw*rs))*0.7;
+  const estInv=Math.max(1,Math.ceil(estTables/spi));
+
+  // Inverter pads: placed along central road, each with dedicated pad area
+  const invPadW=inv.sw+6; // inverter + 3m each side
+  const invPadH=inv.sh+6;
+  const invRects=[];
+  if(estInv>0){
+    // Place inverters along central road, offset to one side
+    const invY=pcy+crHalf+invPadH/2+1; // below central road
+    const invSpacing=(panelBB.x1-panelBB.x0)/(estInv+1);
+    for(let i=0;i<estInv;i++){
+      const ix=panelBB.x0+invSpacing*(i+1);
+      if(pip({x:ix,y:invY},panelBoundary)){
+        const pad={x0:ix-invPadW/2,y0:invY-invPadH/2,x1:ix+invPadW/2,y1:invY+invPadH/2};
+        excl.push(pad);
+        invRects.push({cx:ix,cy:invY,
+          body:[{x:ix-inv.sw/2,y:invY-inv.sh/2},{x:ix+inv.sw/2,y:invY-inv.sh/2},{x:ix+inv.sw/2,y:invY+inv.sh/2},{x:ix-inv.sw/2,y:invY+inv.sh/2}],
+          pad:[{x:pad.x0,y:pad.y0},{x:pad.x1,y:pad.y0},{x:pad.x1,y:pad.y1},{x:pad.x0,y:pad.y1}]
+        });
+      }
+    }
+  }
+
+  // ── GENERATE TABLES ──
+  const azR=G.az*Math.PI/180,cosA=Math.cos(azR),sinA=Math.sin(azR);
+  const diag=Math.hypot(panelBB.x1-panelBB.x0,panelBB.y1-panelBB.y0)*1.2;
+  const gx=1.0;
+  const rawTables=[];
+  for(let ly=-diag/2;ly<diag/2;ly+=rs){
+    for(let lx=-diag/2;lx<diag/2;lx+=tw+gx){
+      const lc=[{x:lx,y:ly},{x:lx+tw,y:ly},{x:lx+tw,y:ly+th},{x:lx,y:ly+th}];
+      const wc=lc.map(c=>({x:pcx+c.x*cosA-c.y*sinA,y:pcy+c.x*sinA+c.y*cosA}));
+      rawTables.push({cx:pcx+(lx+tw/2)*cosA-(ly+th/2)*sinA,cy:pcy+(lx+tw/2)*sinA+(ly+th/2)*cosA,corners:wc});
+    }
+  }
+
+  // Filter 1: all corners inside panel boundary
+  let tables=rawTables.filter(t=>t.corners.every(c=>pip(c,panelBoundary)));
+
+  // Filter 2: no overlap with any exclusion zone
+  tables=tables.filter(t=>{
+    const tb=bx(t.corners);
+    return!excl.some(e=>aabbOv(tb,e));
+  });
+
+  // ── DRAW ──
+  // Setback line
+  addLy(L.polygon(tL(setbackPoly,ct).map(l=>[l.lat,l.lng]),{color:'#94a3b8',weight:1,dashArray:'5 3',fill:false,opacity:.6}));
+
+  // Perimeter road (smoothed)
+  if(doRoadP){
+    const roLL=tL(roadOuterSmooth,ct),riLL=tL(roadInnerSmooth,ct);
+    addLy(L.polygon(roLL.map(l=>[l.lat,l.lng]),{color:'#6b7280',weight:1.5,fill:false,opacity:.55}));
+    addLy(L.polygon(riLL.map(l=>[l.lat,l.lng]),{color:'#6b7280',weight:1.5,fill:false,opacity:.55}));
+    dxf.roads.push(roadOuterSmooth.map(p=>({x:p.x,y:p.y})));
+    dxf.roads.push(roadInnerSmooth.map(p=>({x:p.x,y:p.y})));
+  }
+
+  // Central road
+  if(doRoadC){
+    // Clip to panel boundary x-range
+    const crPts=[{x:panelBB.x0,y:pcy-roadW/2},{x:panelBB.x1,y:pcy-roadW/2},{x:panelBB.x1,y:pcy+roadW/2},{x:panelBB.x0,y:pcy+roadW/2}];
+    addLy(L.polygon(tL(crPts,ct).map(l=>[l.lat,l.lng]),{color:'#6b7280',weight:1,fillColor:'#6b7280',fillOpacity:.08,opacity:.5}));
+    dxf.roads.push(crPts.map(p=>({x:p.x,y:p.y})));
+  }
+
+  // PV Tables
+  tables.forEach(t=>{
+    const lls=tL(t.corners,ct);
+    addLy(L.polygon(lls.map(l=>[l.lat,l.lng]),{color:col,weight:0.7,fill:false}));
+
+    if(showM){
+      for(let mi=4;mi<mps;mi+=4){
+        const f=mi*mod.w/tw;
+        const p1={x:t.corners[0].x+(t.corners[1].x-t.corners[0].x)*f,y:t.corners[0].y+(t.corners[1].y-t.corners[0].y)*f};
+        const p2={x:t.corners[3].x+(t.corners[2].x-t.corners[3].x)*f,y:t.corners[3].y+(t.corners[2].y-t.corners[3].y)*f};
+        const l1=tL([p1],ct)[0],l2=tL([p2],ct)[0];
+        addLy(L.polyline([[l1.lat,l1.lng],[l2.lat,l2.lng]],{color:col,weight:.3,opacity:.35,dashArray:'2 2'}));
+      }
+    }
+    dxf.tables.push(t.corners.map(c=>({x:c.x,y:c.y})));
+  });
+
+  // Inverters with pads
+  invRects.forEach(ir=>{
+    // Pad (dashed)
+    addLy(L.polygon(tL(ir.pad,ct).map(l=>[l.lat,l.lng]),{color:'#a78bfa',weight:.8,dashArray:'4 3',fill:false,opacity:.5}));
+    // Body (solid)
+    addLy(L.polygon(tL(ir.body,ct).map(l=>[l.lat,l.lng]),{color:'#7c3aed',weight:1.5,fillColor:'#7c3aed',fillOpacity:.3})
+      .bindTooltip((inv.t==='c'?'Контейнер ':'Инв. ')+inv.n,{direction:'top'}));
+    dxf.inv.push(ir.body.map(c=>({x:c.x,y:c.y})));
+  });
+
+  // MV Station
+  const mvC=[{x:pcx-mvW/2,y:pcy-mvH/2},{x:pcx+mvW/2,y:pcy-mvH/2},{x:pcx+mvW/2,y:pcy+mvH/2},{x:pcx-mvW/2,y:pcy+mvH/2}];
+  addLy(L.polygon(tL(mvC,ct).map(l=>[l.lat,l.lng]),{color:'#e8640d',weight:2,fillColor:'#e8640d',fillOpacity:.2}).bindTooltip('MV Станция',{direction:'top'}));
+  dxf.mv=mvC.map(c=>({x:c.x,y:c.y}));
+
+  // AC cables (inverters to MV)
+  const tpLL=tL([{x:pcx,y:pcy}],ct)[0];
+  invRects.forEach(ir=>{
+    const f=tL([{x:ir.cx,y:ir.cy}],ct)[0];
+    addLy(L.polyline([[f.lat,f.lng],[tpLL.lat,tpLL.lng]],{color:'#2563eb',weight:1.8,opacity:.45}));
+  });
+
+  // Stats
+  const totalMod=tables.length*mps*rpt;
+  const numInv=invRects.length;
+  const pDC=totalMod*mod.W/1e6,pAC=numInv*inv.pw/1000;
+  const dcac=pAC>0?(pDC/pAC).toFixed(2):'—';
+  const area=aH(G.poly);
+  const gcr=area>0?((tables.length*tw*th/(area*10000))*100).toFixed(1):0;
+
+  $('xM').textContent=totalMod.toLocaleString();
+  $('xD').innerHTML=pDC.toFixed(2)+'<span class="u">MWp</span>';
+  $('xC').innerHTML=pAC.toFixed(2)+'<span class="u">MW</span>';
+  $('xR').textContent=dcac;
+  $('xI').textContent=numInv+(inv.t==='c'?' конт.':' шт.');
+  $('xS').textContent=tables.length.toLocaleString();
+  $('xG').innerHTML=gcr+'<span class="u">%</span>';
+
+  $('ov').classList.remove('active');
+  $('cBtn').style.display='block';
+  $('expBtn').disabled=false;
+  G.dxf=dxf;ss(4,'done');
+  stx(pDC.toFixed(1)+' MWp · '+totalMod.toLocaleString()+' мод.');
+  tst(pDC.toFixed(2)+' MWp');
+}
+
+function addLy(l){l.addTo(map);G.ls.push(l);}
+
+// ═══ DXF ═══
+function expDXF(){
+  if(!G.dxf)return;const d=G.dxf,L=[];
+  function w(s){L.push(s);}
+  w('0');w('SECTION');w('2');w('HEADER');w('9');w('$INSUNITS');w('70');w('6');w('0');w('ENDSEC');
+  w('0');w('SECTION');w('2');w('TABLES');w('0');w('TABLE');w('2');w('LAYER');w('70');w('8');
+  [['SITE',7],['SETBACK',8],['PV_TABLES',5],['INVERTERS',6],['MV_STATION',30],['ROADS',9]].forEach(([n,c])=>{w('0');w('LAYER');w('2');w(n);w('70');w('0');w('62');w(''+c);w('6');w('CONTINUOUS');});
+  w('0');w('ENDTAB');w('0');w('ENDSEC');
+  w('0');w('SECTION');w('2');w('ENTITIES');
+  function ap(pts,ly){w('0');w('LWPOLYLINE');w('8');w(ly);w('90');w(''+pts.length);w('70');w('1');pts.forEach(p=>{w('10');w(p.x.toFixed(3));w('20');w(p.y.toFixed(3));});}
+  if(d.site.length)ap(d.site,'SITE');
+  if(d.sb.length)ap(d.sb,'SETBACK');
+  d.tables.forEach(t=>ap(t,'PV_TABLES'));
+  d.inv.forEach(i=>ap(i,'INVERTERS'));
+  if(d.mv)ap(d.mv,'MV_STATION');
+  d.roads.forEach(r=>ap(r,'ROADS'));
+  w('0');w('ENDSEC');w('0');w('EOF');
+  const blob=new Blob([L.join('\n')],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='SolarFlow_Layout.dxf';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  tst('DXF скачан');
+}
+
+// ═══ HELPERS ═══
+function $(id){return document.getElementById(id);}
+function clrL(){G.ls.forEach(l=>{try{map.removeLayer(l)}catch(e){}});G.ls=[];G.dxf=null;$('cBtn').style.display='none';$('expBtn').disabled=true;rSt(true);}
+function rSt(k){if(!k)$('xA').innerHTML='—<span class="u">га</span>';$('xM').textContent='—';$('xD').innerHTML='—<span class="u">MWp</span>';$('xC').innerHTML='—<span class="u">MW</span>';$('xR').textContent='—';$('xI').textContent='—';$('xS').textContent='—';$('xG').innerHTML='—<span class="u">%</span>';}
+function resetAll(){dI.clearLayers();clrL();G.poly=null;G.lay=null;$('gBtn').disabled=true;$('mhint').style.display='flex';rSt();ss(1,'active');ss(2,'');ss(3,'');ss(4,'');stx('Новый проект');}
+function ss(n,s){$('s'+n).className='step '+s;}
+function stx(t){$('sts').textContent=t;}
+function tst(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+</script>
+</body>
+</html>
